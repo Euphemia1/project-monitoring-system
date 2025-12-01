@@ -138,20 +138,20 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card">
+      <header className="border-b border-gray-300 bg-white">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#E87A1E]">
               <Building2Icon className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-foreground">PMS</h1>
-              <p className="text-xs text-muted-foreground">Project Monitoring</p>
+              <h1 className="text-lg font-bold text-gray-800">PMS</h1>
+              <p className="text-xs text-gray-600">Project Monitoring</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <Link href="/auth/login">
-              <Button variant="ghost" className="text-foreground">
+              <Button variant="ghost" className="text-gray-800 hover:text-[#E87A1E]">
                 Sign In
               </Button>
             </Link>
@@ -163,18 +163,18 @@ export default function HomePage() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-[#1E293B] py-24">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#1E293B] to-[#0F172A]" />
+      <section className="relative overflow-hidden bg-gray-800 py-24">
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-700 to-gray-900" />
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[#E87A1E]/10 px-4 py-2">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2">
               <span className="h-2 w-2 rounded-full bg-[#E87A1E] animate-pulse" />
-              <span className="text-sm font-medium text-[#E87A1E]">Trusted by Construction Companies in Zambia</span>
+              <span className="text-sm font-medium text-amber-800">Trusted by Construction Companies in Zambia</span>
             </div>
             <h2 className="mb-6 text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl text-balance">
               Project Monitoring System
             </h2>
-            <p className="mb-8 text-lg text-gray-300 leading-relaxed text-pretty">
+            <p className="mb-8 text-lg text-gray-200 leading-relaxed text-pretty">
               Streamline your construction project management with our comprehensive digital solution. Track progress,
               manage documents, and automate approvals - all in one place.
             </p>
@@ -188,7 +188,7 @@ export default function HomePage() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="w-full border-gray-600 text-white hover:bg-gray-800 sm:w-auto bg-transparent"
+                  className="w-full border-gray-400 text-white hover:bg-gray-700 sm:w-auto bg-transparent"
                 >
                   Sign In to Dashboard
                 </Button>
@@ -199,43 +199,43 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section className="py-24 bg-background">
+      <section className="py-24 bg-gray-50">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-16 text-center">
-            <h3 className="mb-4 text-3xl font-bold text-foreground">Comprehensive Project Management</h3>
-            <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
+            <h3 className="mb-4 text-3xl font-bold text-gray-800">Comprehensive Project Management</h3>
+            <p className="mx-auto max-w-2xl text-lg text-gray-600">
               Everything you need to monitor construction projects across all districts in Zambia
             </p>
           </div>
 
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             <FeatureCard
-              icon={<ClipboardCheckIcon className="h-8 w-8" />}
+              icon={<ClipboardCheckIcon className="h-8 w-8 text-[#E87A1E]" />}
               title="Progress Tracking"
               description="Monitor trade-by-trade progress with percentage completion and financial tracking"
             />
             <FeatureCard
-              icon={<FileTextIcon className="h-8 w-8" />}
+              icon={<FileTextIcon className="h-8 w-8 text-[#E87A1E]" />}
               title="Document Management"
               description="Centralized storage for contracts, drawings, site instructions, and correspondence"
             />
             <FeatureCard
-              icon={<UsersIcon className="h-8 w-8" />}
+              icon={<UsersIcon className="h-8 w-8 text-[#E87A1E]" />}
               title="Role-Based Access"
               description="Directors, Project Engineers, Project Managers - each with appropriate permissions"
             />
             <FeatureCard
-              icon={<ShieldIcon className="h-8 w-8" />}
+              icon={<ShieldIcon className="h-8 w-8 text-[#E87A1E]" />}
               title="Approval Workflows"
               description="Digital approval process for new projects with complete audit trails"
             />
             <FeatureCard
-              icon={<BarChart3Icon className="h-8 w-8" />}
+              icon={<BarChart3Icon className="h-8 w-8 text-[#E87A1E]" />}
               title="Comprehensive Reports"
               description="Generate summary reports, progress reports, and payment certificates"
             />
             <FeatureCard
-              icon={<Building2Icon className="h-8 w-8" />}
+              icon={<Building2Icon className="h-8 w-8 text-[#E87A1E]" />}
               title="Multi-District Support"
               description="Manage projects across 10 Zambian districts from a single dashboard"
             />
@@ -244,11 +244,11 @@ export default function HomePage() {
       </section>
 
       {/* Districts Section */}
-      <section className="py-24 bg-muted">
+      <section className="py-24 bg-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-12 text-center">
-            <h3 className="mb-4 text-3xl font-bold text-foreground">Serving Major Districts in Zambia</h3>
-            <p className="text-muted-foreground">Active project monitoring across key regions</p>
+            <h3 className="mb-4 text-3xl font-bold text-gray-800">Serving Major Districts in Zambia</h3>
+            <p className="text-gray-600">Active project monitoring across key regions</p>
           </div>
           <div className="flex flex-wrap justify-center gap-4">
             {[
@@ -263,8 +263,8 @@ export default function HomePage() {
               "Chipata",
               "Kasama",
             ].map((district) => (
-              <div key={district} className="rounded-lg bg-card px-6 py-3 shadow-sm border border-border">
-                <span className="font-medium text-foreground">{district}</span>
+              <div key={district} className="rounded-lg bg-gray-50 px-6 py-3 shadow-sm border border-gray-200">
+                <span className="font-medium text-gray-800">{district}</span>
               </div>
             ))}
           </div>
@@ -287,16 +287,16 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-card py-12">
+      <footer className="border-t border-gray-300 bg-white py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#E87A1E]">
                 <Building2Icon className="h-6 w-6 text-white" />
               </div>
-              <span className="font-bold text-foreground">Project Monitoring System</span>
+              <span className="font-bold text-gray-800">Project Monitoring System</span>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-gray-600">
               © {new Date().getFullYear()} PMS. Built for Construction Companies in Zambia.
             </p>
           </div>
@@ -308,12 +308,12 @@ export default function HomePage() {
 
 function FeatureCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-6 transition-shadow hover:shadow-lg">
-      <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-lg bg-[#E87A1E]/10 text-[#E87A1E]">
+    <div className="rounded-xl border border-gray-200 bg-white p-6 transition-shadow hover:shadow-lg">
+      <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-lg bg-amber-50 text-[#E87A1E]">
         {icon}
       </div>
-      <h4 className="mb-2 text-xl font-semibold text-foreground">{title}</h4>
-      <p className="text-muted-foreground">{description}</p>
+      <h4 className="mb-2 text-xl font-semibold text-gray-800">{title}</h4>
+      <p className="text-gray-600">{description}</p>
     </div>
   )
 }

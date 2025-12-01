@@ -9,7 +9,50 @@ import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Building2Icon, Loader2Icon } from "@/components/icons"
+
+function Building2Icon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
+      <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
+      <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
+      <path d="M10 6h4" />
+      <path d="M10 10h4" />
+      <path d="M10 14h4" />
+      <path d="M10 18h4" />
+    </svg>
+  )
+}
+
+function Loader2Icon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
+  )
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -20,27 +63,44 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log("Login attempt with email:", email)
+    
+    // Validate inputs
+    if (!email || !password) {
+      setError("Please enter both email and password")
+      return
+    }
+    
     const supabase = createClient()
     setIsLoading(true)
     setError(null)
 
     try {
+      console.log("Attempting to sign in with Supabase...")
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
-      if (error) throw error
-
-      // Set cookies manually for session persistence
-      if (data.session) {
-        document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`
-        document.cookie = `sb-refresh-token=${data.session.refresh_token}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`
+      
+      console.log("Supabase response:", { data, error })
+      
+      if (error) {
+        console.error("Supabase login error:", error)
+        throw error
       }
 
-      router.push("/dashboard")
-      router.refresh()
+      console.log("Login successful, session data:", data)
+      // Small delay to ensure session is properly set
+      setTimeout(() => {
+        console.log("Redirecting to dashboard...")
+        router.push("/dashboard")
+        router.refresh()
+      }, 500)
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred")
+      console.error("Login error:", error)
+      const errorMessage = error instanceof Error ? error.message : "An error occurred during login"
+      setError(errorMessage)
+      console.log("Login error message:", errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -49,7 +109,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen w-full">
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[#1E293B] flex-col justify-between p-12">
+      <div className="hidden lg:flex lg:w-1/2 bg-gray-800 flex-col justify-between p-12">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#E87A1E]">
             <Building2Icon className="h-7 w-7 text-white" />

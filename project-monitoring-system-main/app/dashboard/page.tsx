@@ -14,40 +14,68 @@ import {
   Building2Icon,
 } from "@/components/icons"
 import type { Project } from "@/lib/types"
+import { redirect } from "next/navigation"
 
 export default async function DashboardPage() {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Add error handling for auth
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  
+  // Redirect to login if not authenticated
+  if (authError || !user) {
+    redirect("/auth/login")
+  }
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user?.id).single()
+  // Add error handling for profile fetch
+  const { data: profile, error: profileError } = await supabase.from("profiles").select("*").eq("id", user?.id).single()
+  
+  // Redirect to login if profile doesn't exist
+  if (profileError || !profile) {
+    // Try to create a profile if it doesn't exist
+    const { error: createProfileError } = await supabase.from("profiles").insert({
+      id: user.id,
+      email: user.email,
+      full_name: user.email?.split("@")[0] || "User",
+      role: "viewer"
+    })
+    
+    // If profile creation fails, redirect to login
+    if (createProfileError) {
+      redirect("/auth/login")
+    }
+    
+    // If profile was created, fetch it again
+    const { data: newProfile } = await supabase.from("profiles").select("*").eq("id", user?.id).single()
+    if (!newProfile) {
+      redirect("/auth/login")
+    }
+  }
 
-  // Fetch statistics
-  const { count: totalProjects } = await supabase.from("projects").select("*", { count: "exact", head: true })
+  // Fetch statistics with error handling
+  const { count: totalProjects, error: totalProjectsError } = await supabase.from("projects").select("*", { count: "exact", head: true })
 
-  const { count: pendingProjects } = await supabase
+  const { count: pendingProjects, error: pendingProjectsError } = await supabase
     .from("projects")
     .select("*", { count: "exact", head: true })
     .eq("status", "pending_approval")
 
-  const { count: activeProjects } = await supabase
+  const { count: activeProjects, error: activeProjectsError } = await supabase
     .from("projects")
     .select("*", { count: "exact", head: true })
     .eq("status", "in_progress")
 
-  const { count: totalDocuments } = await supabase.from("documents").select("*", { count: "exact", head: true })
+  const { count: totalDocuments, error: totalDocumentsError } = await supabase.from("documents").select("*", { count: "exact", head: true })
 
-  // Fetch recent projects
-  const { data: recentProjects } = await supabase
+  // Fetch recent projects with error handling
+  const { data: recentProjects, error: recentProjectsError } = await supabase
     .from("projects")
     .select("*, district:districts(name), creator:profiles(full_name)")
     .order("created_at", { ascending: false })
     .limit(5)
 
-  // Fetch recent progress reports
-  const { data: recentReports } = await supabase
+  // Fetch recent progress reports with error handling
+  const { data: recentReports, error: recentReportsError } = await supabase
     .from("progress_reports")
     .select("*, project:projects(contract_name), creator:profiles(full_name)")
     .order("created_at", { ascending: false })
