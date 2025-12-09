@@ -13,93 +13,197 @@ import {
   ArrowRightIcon,
   Building2Icon,
 } from "@/components/icons"
-import type { Project } from "@/lib/types"
+import type { Profile, ProjectStatus } from "@/lib/types"
 import { redirect } from "next/navigation"
+
+// Status badge styles
+const statusStyles: Record<string, string> = {
+  pending_approval: "bg-amber-100 text-amber-800 border-amber-200",
+  approved: "bg-blue-100 text-blue-800 border-blue-200",
+  in_progress: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  completed: "bg-gray-100 text-gray-800 border-gray-200",
+  on_hold: "bg-red-100 text-red-800 border-red-200",
+  default: "bg-gray-100 text-gray-800",
+}
+
+// Typed responses
+type RecentProject = {
+  id: string
+  contract_name: string
+  contract_no: string
+  status: ProjectStatus
+  created_at: string
+  district: { name: string } | null
+  creator: { full_name: string } | null
+}
+
+type RecentReport = {
+  id: string
+  report_no: number
+  report_date: string
+  project: { contract_name: string } | null
+  creator: { full_name: string } | null
+}
+
+// Helper for StatsCard trends
+function computeTrend(current: number, previous: number = 0) {
+  const value = current - previous
+  return { value: Math.abs(value), isPositive: value >= 0 }
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient()
 
-  // Add error handling for auth
+  // --- Authentication ---
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  
-  // Redirect to login if not authenticated
-  if (authError || !user) {
-    redirect("/auth/login")
-  }
+  if (authError || !user) redirect("/auth/login")
 
-  // Add error handling for profile fetch
-  const { data: profile, error: profileError } = await supabase.from("profiles").select("*").eq("id", user?.id).single()
-  
-  // Redirect to login if profile doesn't exist
+  // --- Get or create profile ---
+  let { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single<Profile>()
+
   if (profileError || !profile) {
-    // Try to create a profile if it doesn't exist
     const { error: createProfileError } = await supabase.from("profiles").insert({
       id: user.id,
-      email: user.email,
+      email: user.email || '',
       full_name: user.email?.split("@")[0] || "User",
-      role: "viewer"
+      role: "viewer",
+      locale: "en-ZM",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     })
-    
-    // If profile creation fails, redirect to login
+
     if (createProfileError) {
+      console.error("Failed to create profile:", createProfileError)
       redirect("/auth/login")
     }
-    
-    // If profile was created, fetch it again
-    const { data: newProfile } = await supabase.from("profiles").select("*").eq("id", user?.id).single()
+
+    const { data: newProfile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single<Profile>()
+
     if (!newProfile) {
+      console.error("Failed to fetch new profile")
       redirect("/auth/login")
     }
+
+    profile = newProfile
   }
 
-  // Fetch statistics with error handling
-  const { count: totalProjects, error: totalProjectsError } = await supabase.from("projects").select("*", { count: "exact", head: true })
+  // --- Fetch statistics ---
+  let totalProjects = 0
+  let pendingProjects = 0
+  let activeProjects = 0
+  let totalDocuments = 0
 
-  const { count: pendingProjects, error: pendingProjectsError } = await supabase
-    .from("projects")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "pending_approval")
+  try {
+    const [
+      { count: totalProjectsCount = 0 },
+      { count: pendingProjectsCount = 0 },
+      { count: activeProjectsCount = 0 },
+      { count: totalDocumentsCount = 0 },
+    ] = await Promise.all([
+      supabase.from("projects").select("*", { count: "exact", head: true }),
+      supabase.from("projects").select("*", { count: "exact", head: true }).eq("status", "pending_approval"),
+      supabase.from("projects").select("*", { count: "exact", head: true }).eq("status", "in_progress"),
+      supabase.from("documents").select("*", { count: "exact", head: true }),
+    ])
 
-  const { count: activeProjects, error: activeProjectsError } = await supabase
-    .from("projects")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "in_progress")
+    totalProjects = totalProjectsCount || 0
+    pendingProjects = pendingProjectsCount || 0
+    activeProjects = activeProjectsCount || 0
+    totalDocuments = totalDocumentsCount || 0
+  } catch (error) {
+    console.error("Error fetching statistics:", error)
+  }
 
-  const { count: totalDocuments, error: totalDocumentsError } = await supabase.from("documents").select("*", { count: "exact", head: true })
+  // --- Fetch recent projects & reports ---
+  let recentProjects: RecentProject[] = []
+  let recentReports: RecentReport[] = []
 
-  // Fetch recent projects with error handling
-  const { data: recentProjects, error: recentProjectsError } = await supabase
-    .from("projects")
-    .select("*, district:districts(name), creator:profiles(full_name)")
-    .order("created_at", { ascending: false })
-    .limit(5)
+  try {
+    // Projects - FIXED: Remove duplicate declaration
+    const { data: projectsData, error: projectsError } = await supabase
+      .from("projects")
+      .select(`
+        id,
+        contract_name,
+        contract_no,
+        status,
+        created_at,
+        district:districts(name),
+        creator:profiles(full_name)
+      `)
+      .order("created_at", { ascending: false })
+      .limit(5)
 
-  // Fetch recent progress reports with error handling
-  const { data: recentReports, error: recentReportsError } = await supabase
-    .from("progress_reports")
-    .select("*, project:projects(contract_name), creator:profiles(full_name)")
-    .order("created_at", { ascending: false })
-    .limit(5)
-
-  const getStatusBadge = (status: string) => {
-    const statusStyles: Record<string, string> = {
-      pending_approval: "bg-amber-100 text-amber-800 border-amber-200",
-      approved: "bg-blue-100 text-blue-800 border-blue-200",
-      in_progress: "bg-emerald-100 text-emerald-800 border-emerald-200",
-      completed: "bg-gray-100 text-gray-800 border-gray-200",
-      on_hold: "bg-red-100 text-red-800 border-red-200",
+    if (projectsError) {
+      console.error('Error fetching projects:', projectsError)
+      recentProjects = []
+    } else if (projectsData) {
+      recentProjects = projectsData.map(p => ({
+        id: p.id,
+        contract_name: p.contract_name,
+        contract_no: p.contract_no,
+        status: p.status,
+        created_at: p.created_at,
+        district: p.district ?? null,
+        creator: p.creator ?? null,
+      }))
     }
-    return statusStyles[status] || "bg-gray-100 text-gray-800"
+
+    // Reports
+    const { data: reportsData, error: reportsError } = await supabase
+      .from("progress_reports")
+      .select(`
+        id,
+        report_no,
+        report_date,
+        project:projects(contract_name),
+        creator:profiles(full_name)
+      `)
+      .order("created_at", { ascending: false })
+      .limit(5)
+
+    if (reportsError) {
+      console.error('Error fetching reports:', reportsError)
+      recentReports = []
+    } else if (reportsData) {
+      recentReports = reportsData.map(r => ({
+        id: r.id,
+        report_no: r.report_no,
+        report_date: r.report_date,
+        project: r.project ?? null,
+        creator: r.creator ?? null,
+      }))
+    }
+  } catch (err) {
+    console.error("Error fetching dashboard data:", err)
+    recentProjects = []
+    recentReports = []
+  } // <-- This closes the try-catch block
+
+  // --- Helper functions ---
+  const getStatusBadge = (status: ProjectStatus) => statusStyles[status] || statusStyles.default
+  const getUserLocale = () => profile?.locale || "en-ZM"
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'N/A'
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return 'Invalid Date'
+    return date.toLocaleDateString(getUserLocale(), { day: 'numeric', month: 'short', year: 'numeric' })
   }
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-ZM", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    })
-  }
+  // --- Compute trends ---
+  const totalProjectsTrend = computeTrend(totalProjects || 0)
+  const pendingProjectsTrend = computeTrend(pendingProjects || 0)
+  const activeProjectsTrend = computeTrend(activeProjects || 0)
 
+  // --- Render ---
   return (
     <div className="min-h-screen">
       <Header title={`Welcome, ${profile?.full_name || "User"}`} subtitle="Here's an overview of your projects" />
@@ -107,25 +211,10 @@ export default async function DashboardPage() {
       <div className="p-6 space-y-6">
         {/* Stats Grid */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <StatsCard
-            title="Total Projects"
-            value={totalProjects || 0}
-            icon={<FolderKanbanIcon className="h-6 w-6" />}
-            trend={{ value: 12, isPositive: true }}
-          />
-          <StatsCard
-            title="Pending Approval"
-            value={pendingProjects || 0}
-            icon={<ClockIcon className="h-6 w-6" />}
-            subtitle="Awaiting director review"
-          />
-          <StatsCard
-            title="Active Projects"
-            value={activeProjects || 0}
-            icon={<ClipboardCheckIcon className="h-6 w-6" />}
-            trend={{ value: 8, isPositive: true }}
-          />
-          <StatsCard title="Total Documents" value={totalDocuments || 0} icon={<FileTextIcon className="h-6 w-6" />} />
+          <StatsCard title="Total Projects" value={totalProjects} icon={<FolderKanbanIcon className="h-6 w-6" />} trend={totalProjectsTrend} />
+          <StatsCard title="Pending Approval" value={pendingProjects} icon={<ClockIcon className="h-6 w-6" />} subtitle={pendingProjects > 0 ? "Awaiting review" : "No pending approvals"} trend={pendingProjectsTrend} />
+          <StatsCard title="Active Projects" value={activeProjects} icon={<ClipboardCheckIcon className="h-6 w-6" />} trend={activeProjectsTrend} />
+          <StatsCard title="Total Documents" value={totalDocuments} icon={<FileTextIcon className="h-6 w-6" />} />
         </div>
 
         {/* Recent Activity */}
@@ -135,36 +224,22 @@ export default async function DashboardPage() {
             <CardHeader className="flex flex-row items-center justify-between pb-4">
               <CardTitle className="text-lg font-semibold text-foreground">Recent Projects</CardTitle>
               <Link href="/dashboard/projects">
-                <Button variant="ghost" size="sm" className="text-[#E87A1E]">
-                  View All <ArrowRightIcon className="ml-1 h-4 w-4" />
-                </Button>
+                <Button variant="ghost" size="sm" className="text-[#E87A1E]">View All <ArrowRightIcon className="ml-1 h-4 w-4" /></Button>
               </Link>
             </CardHeader>
             <CardContent className="space-y-4">
-              {recentProjects && recentProjects.length > 0 ? (
-                recentProjects.map(
-                  (project: Project & { district: { name: string }; creator: { full_name: string } }) => (
-                    <Link
-                      key={project.id}
-                      href={`/dashboard/projects/${project.id}`}
-                      className="flex items-center gap-4 rounded-lg border border-border p-4 transition-colors hover:bg-muted"
-                    >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#E87A1E]/10">
-                        <Building2Icon className="h-5 w-5 text-[#E87A1E]" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground truncate">{project.contract_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {project.contract_no} • {project.district?.name}
-                        </p>
-                      </div>
-                      <Badge variant="outline" className={getStatusBadge(project.status)}>
-                        {project.status.replace("_", " ")}
-                      </Badge>
-                    </Link>
-                  ),
-                )
-              ) : (
+              {recentProjects.length ? recentProjects.map(project => (
+                <Link key={project.id} href={`/dashboard/projects/${project.id}`} className="flex items-center gap-4 rounded-lg border border-border p-4 transition-colors hover:bg-muted">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#E87A1E]/10">
+                    <Building2Icon className="h-5 w-5 text-[#E87A1E]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground truncate">{project.contract_name}</p>
+                    <p className="text-sm text-muted-foreground">{project.contract_no} • {project.district?.name}</p>
+                  </div>
+                  <Badge variant="outline" className={getStatusBadge(project.status)}>{project.status.replace("_", " ")}</Badge>
+                </Link>
+              )) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <FolderKanbanIcon className="mx-auto h-12 w-12 mb-3 opacity-20" />
                   <p>No projects yet</p>
@@ -178,42 +253,30 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Recent Progress Reports */}
+          {/* Recent Reports */}
           <Card className="border-border">
             <CardHeader className="flex flex-row items-center justify-between pb-4">
               <CardTitle className="text-lg font-semibold text-foreground">Recent Progress Reports</CardTitle>
               <Link href="/dashboard/progress">
-                <Button variant="ghost" size="sm" className="text-[#E87A1E]">
-                  View All <ArrowRightIcon className="ml-1 h-4 w-4" />
-                </Button>
+                <Button variant="ghost" size="sm" className="text-[#E87A1E]">View All <ArrowRightIcon className="ml-1 h-4 w-4" /></Button>
               </Link>
             </CardHeader>
             <CardContent className="space-y-4">
-              {recentReports && recentReports.length > 0 ? (
-                recentReports.map(
-                  (report: {
-                    id: string
-                    report_no: number
-                    report_date: string
-                    project: { contract_name: string }
-                    creator: { full_name: string }
-                  }) => (
-                    <div key={report.id} className="flex items-center gap-4 rounded-lg border border-border p-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100">
-                        <ClipboardCheckIcon className="h-5 w-5 text-emerald-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground truncate">Report #{report.report_no}</p>
-                        <p className="text-sm text-muted-foreground truncate">{report.project?.contract_name}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground">{formatDate(report.report_date)}</p>
-                        <p className="text-xs text-muted-foreground">{report.creator?.full_name}</p>
-                      </div>
-                    </div>
-                  ),
-                )
-              ) : (
+              {recentReports.length ? recentReports.map(report => (
+                <div key={report.id} className="flex items-center gap-4 rounded-lg border border-border p-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100">
+                    <ClipboardCheckIcon className="h-5 w-5 text-emerald-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground truncate">Report #{report.report_no}</p>
+                    <p className="text-sm text-muted-foreground truncate">{report.project?.contract_name}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">{formatDate(report.report_date)}</p>
+                    <p className="text-xs text-muted-foreground">{report.creator?.full_name}</p>
+                  </div>
+                </div>
+              )) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <ClipboardCheckIcon className="mx-auto h-12 w-12 mb-3 opacity-20" />
                   <p>No progress reports yet</p>
@@ -225,4 +288,4 @@ export default async function DashboardPage() {
       </div>
     </div>
   )
-}
+} // <-- This closes the component function

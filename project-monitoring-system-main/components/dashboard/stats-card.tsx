@@ -6,10 +6,10 @@ interface StatsCardProps {
   value: string | number
   subtitle?: string
   icon: ReactNode
-  trend?: {
-    value: number
-    isPositive: boolean
-  }
+ trend?: {
+  value: number
+  isPositive: boolean
+} | null
   className?: string
 }
 

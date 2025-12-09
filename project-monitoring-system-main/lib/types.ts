@@ -32,6 +32,7 @@ export interface Profile {
   phone: string | null
   created_at: string
   updated_at: string
+  locale?: string | null
   district?: District
 }
 
