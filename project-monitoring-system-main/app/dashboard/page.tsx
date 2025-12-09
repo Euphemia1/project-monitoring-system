@@ -127,7 +127,7 @@ export default async function DashboardPage() {
   let recentReports: RecentReport[] = []
 
   try {
-    // Projects - FIXED: Remove duplicate declaration
+    // Projects
     const { data: projectsData, error: projectsError } = await supabase
       .from("projects")
       .select(`
@@ -152,8 +152,8 @@ export default async function DashboardPage() {
         contract_no: p.contract_no,
         status: p.status,
         created_at: p.created_at,
-        district: p.district ?? null,
-        creator: p.creator ?? null,
+        district: p.district && p.district.length > 0 ? p.district[0] : null,
+        creator: p.creator && p.creator.length > 0 ? p.creator[0] : null,
       }))
     }
 
@@ -178,8 +178,8 @@ export default async function DashboardPage() {
         id: r.id,
         report_no: r.report_no,
         report_date: r.report_date,
-        project: r.project ?? null,
-        creator: r.creator ?? null,
+        project: r.project && r.project.length > 0 ? r.project[0] : null,
+        creator: r.creator && r.creator.length > 0 ? r.creator[0] : null,
       }))
     }
   } catch (err) {
