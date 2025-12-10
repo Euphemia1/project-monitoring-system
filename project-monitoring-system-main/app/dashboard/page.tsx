@@ -66,7 +66,8 @@ export default async function DashboardPage() {
     .single<Profile>()
 
   if (profileError || !profile) {
-    const { error: createProfileError } = await supabase.from("profiles").insert({
+    // Try to create profile with more robust error handling
+    const profileData = {
       id: user.id,
       email: user.email || '',
       full_name: user.email?.split("@")[0] || "User",
@@ -74,25 +75,47 @@ export default async function DashboardPage() {
       locale: "en-ZM",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-    })
+    };
+
+    const { error: createProfileError } = await supabase.from("profiles").insert(profileData);
 
     if (createProfileError) {
-      console.error("Failed to create profile:", createProfileError)
-      redirect("/auth/login")
+      console.error("Failed to create profile:", createProfileError);
+      // Try one more time with a slight delay
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const { error: retryError } = await supabase.from("profiles").insert(profileData);
+      
+      if (retryError) {
+        console.error("Failed to create profile on retry:", retryError);
+        redirect("/auth/login");
+      }
     }
 
-    const { data: newProfile } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single<Profile>()
+    // Fetch the newly created profile with retry logic
+    let retryCount = 0;
+    let newProfile = null;
+    
+    while (retryCount < 3 && !newProfile) {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single<Profile>();
+      
+      if (data && !error) {
+        newProfile = data;
+      } else {
+        retryCount++;
+        await new Promise(resolve => setTimeout(resolve, 500 * retryCount)); // Exponential backoff
+      }
+    }
 
     if (!newProfile) {
-      console.error("Failed to fetch new profile")
-      redirect("/auth/login")
+      console.error("Failed to fetch new profile after creation");
+      redirect("/auth/login");
     }
 
-    profile = newProfile
+    profile = newProfile;
   }
 
   // --- Fetch statistics ---

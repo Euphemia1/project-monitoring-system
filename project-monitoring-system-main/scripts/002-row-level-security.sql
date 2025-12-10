@@ -21,8 +21,9 @@ CREATE POLICY "Profiles are viewable by authenticated users" ON profiles
 CREATE POLICY "Users can update their own profile" ON profiles
   FOR UPDATE USING (auth.uid() = id);
 
-CREATE POLICY "Users can insert their own profile" ON profiles
-  FOR INSERT WITH CHECK (auth.uid() = id);
+-- Allow the auth trigger to insert profiles (using SECURITY DEFINER function)
+CREATE POLICY "System can insert profiles" ON profiles
+  FOR INSERT WITH CHECK (true);
 
 -- Helper function to get user role
 CREATE OR REPLACE FUNCTION get_user_role(user_id UUID)

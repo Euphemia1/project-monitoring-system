@@ -123,26 +123,36 @@ export default function SignUpPage() {
     const supabase = createClient()
 
     try {
+      console.log("Attempting signup with data:", {
+        email,
+        fullName,
+        role,
+        districtId,
+        phone
+      });
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             full_name: fullName,
-            role: role,
+            role: role || 'viewer',
             district_id: districtId || null,
             phone: phone || null,
           },
         },
       })
 
+      console.log("Supabase signup response:", { authData, authError });
+
       if (authError) throw authError
 
-      if (authData.user) {
-        router.push("/auth/sign-up-success")
-      }
+      console.log('Signup successful, redirecting to success page');
+      router.push("/auth/sign-up-success")
     } catch (error: unknown) {
+      console.error("Signup error:", error);
       setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
       setIsLoading(false)
