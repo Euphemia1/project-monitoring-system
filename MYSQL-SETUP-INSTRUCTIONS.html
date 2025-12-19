@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MySQL Setup Instructions</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        .step {
+            background-color: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .code {
+            background-color: #f1f1f1;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            overflow-x: auto;
+        }
+        .note {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MySQL Setup Instructions</h1>
+        <p>Follow these steps to set up MySQL for the Project Monitoring System:</p>
+
+        <div class="step">
+            <h2>Step 1: Start MySQL Server</h2>
+            <p>If you're using XAMPP:</p>
+            <ol>
+                <li>Open XAMPP Control Panel</li>
+                <li>Find the "MySQL" row</li>
+                <li>Click the "Start" button</li>
+                <li>Wait until the status shows "Running"</li>
+            </ol>
+            <p>Alternatively, you can run the provided batch file:</p>
+            <div class="code">
+                start-mysql.bat
+            </div>
+        </div>
+
+        <div class="step">
+            <h2>Step 2: Create Database</h2>
+            <p>Open a command prompt or terminal and run:</p>
+            <div class="code">
+                mysql -u root -e "CREATE DATABASE IF NOT EXISTS project_monitoring;"
+            </div>
+        </div>
+
+        <div class="step">
+            <h2>Step 3: Execute Database Schema</h2>
+            <p>Navigate to the project directory and run:</p>
+            <div class="code">
+                mysql -u root project_monitoring &lt; mysql-schema.sql
+            </div>
+        </div>
+
+        <div class="step">
+            <h2>Step 4: Verify Installation</h2>
+            <p>You can verify that everything is set up correctly by checking that the tables were created:</p>
+            <div class="code">
+                mysql -u root project_monitoring -e "SHOW TABLES;"
+            </div>
+            <p>You should see the following tables:</p>
+            <ul>
+                <li>districts</li>
+                <li>document_types</li>
+                <li>documents</li>
+                <li>progress_reports</li>
+                <li>project_sections</li>
+                <li>projects</li>
+                <li>trade_progress</li>
+                <li>trades</li>
+                <li>user_roles</li>
+                <li>users</li>
+            </ul>
+        </div>
+
+        <div class="success">
+            <h2>Success!</h2>
+            <p>Once you've completed these steps, you can start the development server:</p>
+            <div class="code">
+                npm run dev
+            </div>
+            <p>Then visit <a href="http://localhost:3000">http://localhost:3000</a> to access the application.</p>
+        </div>
+
+        <div class="note">
+            <h3>Note:</h3>
+            <p>If you encounter any issues:</p>
+            <ul>
+                <li>Make sure no other MySQL instances are running</li>
+                <li>Check that the MySQL service is properly started</li>
+                <li>Ensure you have the necessary permissions to create databases</li>
+                <li>Verify that the MySQL bin directory is in your system PATH</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
