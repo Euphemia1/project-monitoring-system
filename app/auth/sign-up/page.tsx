@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { registerUser } from "@/lib/auth"
+import { signUpAction } from "../actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -50,7 +50,7 @@ export default function SignUpPage() {
   useEffect(() => {
     const fetchDistricts = async () => {
       try {
-        const { getDistricts } = await import('./actions')
+        const { getDistricts } = await import('../actions')
         const result = await getDistricts()
         if (result.success && result.data && result.data.length > 0) setDistricts(result.data)
       } catch {
@@ -78,19 +78,18 @@ export default function SignUpPage() {
     }
 
     try {
-      const result = await registerUser(
+      const result = await signUpAction({
+        name: fullName,
         email,
         password,
-        fullName,
         role,
-        districtId || null,
-        phone || null
-      )
+        district_id: districtId ? Number(districtId) : undefined,
+      })
 
-      if (result) {
+      if (result.success) {
         router.push("/auth/sign-up-success")
       } else {
-        throw new Error("Failed to register user")
+        throw new Error(result.error || "Failed to register user")
       }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred")

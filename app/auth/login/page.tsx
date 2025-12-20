@@ -1,7 +1,8 @@
 "use client"
 
 import type React from "react"
-import { authenticateUser } from "@/lib/auth"
+// import { loginAction } from "@/app/actions/auth"
+import { loginAction } from "../actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -18,28 +19,29 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError(null)
+ const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault()
+  setIsLoading(true)
+  setError(null)
 
-    try {
-      const result = await authenticateUser(email, password)
-      if (!result) {
-        throw new Error("Invalid email or password")
-      }
+  try {
+    const result = await loginAction(email, password)
 
-      // Set cookies manually for session persistence
-      document.cookie = `auth-token=${result.token}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`
-
-      router.push("/dashboard")
-      router.refresh()
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred")
-    } finally {
-      setIsLoading(false)
+    if (!result.success) {
+      throw new Error(result.error || "Invalid email or password")
     }
+
+    // Set cookies manually for session persistence
+    document.cookie = `auth-token=${result.token}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`
+
+    router.push("/dashboard")
+    router.refresh()
+  } catch (error: unknown) {
+    setError(error instanceof Error ? error.message : "An error occurred")
+  } finally {
+    setIsLoading(false)
   }
+}
 
   return (
     <div className="flex min-h-screen w-full">
@@ -163,4 +165,5 @@ export default function LoginPage() {
       </div>
     </div>
   )
+
 }
