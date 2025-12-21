@@ -1,43 +1,92 @@
-import { createClient } from "@/lib/supabase/server"
+"use server"
+
 import { Header } from "@/components/dashboard/header"
 import { ProjectsTable } from "@/components/projects/projects-table"
-import type { Project, Profile } from "@/lib/types"
+import { query } from "@/lib/db"
+
+interface Project {
+  id: string
+  contract_no: string
+  contract_name: string
+  status: string
+  start_date: string
+  completion_date: string
+  contract_sum: number
+  district_id: string
+  district: {
+    id: string
+    name: string
+    code: string
+  }
+  creator: {
+    id: string
+    full_name: string
+  }
+}
 
 export default async function ProjectsPage() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user?.id).single()
-
-  const { data: projects } = await supabase
-    .from("projects")
-    .select(`
-      *,
-      district:districts(id, name, code),
-      creator:profiles!projects_created_by_fkey(id, full_name)
+  try {
+    // Fetch projects with related data
+    const projects = await query(`
+      SELECT 
+        p.*,
+        d.id as district_id,
+        d.name as district_name,
+        d.code as district_code,
+        u.id as creator_id,
+        u.name as creator_name
+      FROM projects p
+      LEFT JOIN districts d ON p.district_id = d.id
+      LEFT JOIN users u ON p.created_by = u.id
+      ORDER BY p.created_at DESC
     `)
-    .order("created_at", { ascending: false })
 
-  const { data: districts } = await supabase.from("districts").select("*").order("name")
+    // Fetch all districts for the filter
+    const districts = await query(`
+      SELECT * FROM districts ORDER BY name
+    `)
 
-  return (
-    <div className="min-h-screen">
-      <Header title="Projects" subtitle="Manage all construction projects" />
-      <div className="p-6">
-        <ProjectsTable
-          projects={
-            (projects || []) as (Project & {
-              district: { id: string; name: string; code: string }
-              creator: { id: string; full_name: string }
-            })[]
-          }
-          districts={districts || []}
-          userRole={profile?.role as Profile["role"]}
+    // Transform the data to match the expected format
+    const formattedProjects = (Array.isArray(projects) ? projects : []).map(project => ({
+      ...project,
+      district: {
+        id: project.district_id,
+        name: project.district_name,
+        code: project.district_code
+      },
+      creator: {
+        id: project.creator_id,
+        full_name: project.creator_name
+      }
+    }))
+
+    // Get user role from session
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    const userRole = user?.role || 'viewer'
+
+    return (
+      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+        <Header
+          title="Projects"
+          description="Manage all construction projects"
+        />
+        <ProjectsTable 
+          projects={formattedProjects} 
+          districts={Array.isArray(districts) ? districts : []} 
+          userRole={userRole}
         />
       </div>
-    </div>
-  )
+    )
+  } catch (error) {
+    console.error('Error loading projects:', error)
+    return (
+      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+        <Header
+          title="Projects"
+          description="Error loading projects"
+        />
+        <div className="text-red-500">Failed to load projects. Please try again later.</div>
+      </div>
+    )
+  }
 }

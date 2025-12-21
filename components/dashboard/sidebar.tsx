@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import {
   Building2Icon,
@@ -40,12 +39,12 @@ export function Sidebar({ profile }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
 
   const handleSignOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    // Clear cookies
-    document.cookie = "sb-access-token=; path=/; max-age=0"
-    document.cookie = "sb-refresh-token=; path=/; max-age=0"
-    router.push("/auth/login")
+    // Clear user data from localStorage
+    localStorage.removeItem('user')
+    // Clear auth token
+    document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    // Redirect to login
+    router.push('/auth/login')
     router.refresh()
   }
 
@@ -93,75 +92,60 @@ export function Sidebar({ profile }: SidebarProps) {
           </Button>
         </div>
 
-        {/* Quick Action */}
-        {canCreateProject && (
-          <div className="p-4 border-b border-gray-700">
-            <Link href="/dashboard/projects/new">
-              <Button
-                className={cn("bg-[#E87A1E] text-white hover:bg-[#D16A0E]", collapsed ? "w-10 h-10 p-0" : "w-full")}
-              >
-                <PlusIcon className={cn("h-5 w-5", !collapsed && "mr-2")} />
-                {!collapsed && "New Project"}
-              </Button>
-            </Link>
-          </div>
-        )}
-
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 p-4">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
-            const Icon = item.icon
-            return (
+        <nav className="flex-1 overflow-y-auto p-2">
+          <div className="space-y-1">
+            {navigation.map((item) => (
               <Link
-                key={item.name}
+                key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive ? "bg-[#E87A1E] text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white",
+                  "group flex items-center rounded-md px-3 py-2 text-sm font-medium",
+                  pathname === item.href
+                    ? "bg-gray-800 text-white"
+                    : "text-gray-300 hover:bg-gray-800 hover:text-white",
+                  collapsed ? "justify-center" : "justify-start"
                 )}
               >
-                <Icon className="h-5 w-5 shrink-0" />
+                <item.icon
+                  className={cn(
+                    "h-5 w-5 flex-shrink-0",
+                    collapsed ? "mr-0" : "mr-3"
+                  )}
+                  aria-hidden="true"
+                />
                 {!collapsed && item.name}
               </Link>
-            )
-          })}
+            ))}
+          </div>
         </nav>
 
-        {/* User Section */}
+        {/* User section */}
         <div className="border-t border-gray-700 p-4">
-          {!collapsed && (
-            <div className="mb-3 rounded-lg bg-gray-800 p-3">
-              <p className="text-sm font-medium text-white truncate">{profile.full_name}</p>
-              <p className="text-xs text-gray-400 capitalize">{profile.role.replace("_", " ")}</p>
-            </div>
-          )}
-          <div className={cn("flex", collapsed ? "flex-col gap-2" : "gap-2")}>
-            <Link href="/dashboard/settings" className={collapsed ? "" : "flex-1"}>
-              <Button
-                variant="ghost"
-                size={collapsed ? "icon" : "sm"}
-                className="text-gray-400 hover:text-white w-full"
-              >
-                <SettingsIcon className="h-4 w-4" />
-                {!collapsed && <span className="ml-2">Settings</span>}
-              </Button>
-            </Link>
+          <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}>
+            {!collapsed && (
+              <div className="flex items-center">
+                <div className="h-8 w-8 rounded-full bg-gray-600 flex items-center justify-center text-white">
+                  {profile.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-white">{profile.name}</p>
+                  <p className="text-xs text-gray-400">{profile.role}</p>
+                </div>
+              </div>
+            )}
             <Button
               variant="ghost"
-              size={collapsed ? "icon" : "sm"}
+              size="icon"
               className="text-gray-400 hover:text-white"
               onClick={handleSignOut}
+              title="Sign out"
             >
-              <LogOutIcon className="h-4 w-4" />
-              {!collapsed && <span className="ml-2">Sign Out</span>}
+              <LogOutIcon className="h-5 w-5" />
             </Button>
           </div>
         </div>
       </aside>
-
-      {/* Mobile overlay */}
-      {!collapsed && <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setCollapsed(true)} />}
     </>
   )
 }

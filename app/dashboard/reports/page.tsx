@@ -1,57 +1,190 @@
-import { createClient } from "@/lib/supabase/server"
+"use server"
+
 import { Header } from "@/components/dashboard/header"
-import { ReportsView } from "@/components/reports/reports-view"
+import { query } from "@/lib/db"
+
+interface Report {
+  id: string
+  title: string
+  type: string
+  generated_at: string
+  url: string
+  project_id: string
+  project_name: string
+  generated_by: string
+  status: 'pending' | 'completed' | 'failed'
+}
 
 export default async function ReportsPage() {
-  const supabase = await createClient()
+  try {
+    // Fetch reports with related data
+    const reports = await query(`
+      SELECT 
+        r.*,
+        p.contract_name as project_name,
+        u.name as generated_by_name
+      FROM reports r
+      LEFT JOIN projects p ON r.project_id = p.id
+      LEFT JOIN users u ON r.generated_by = u.id
+      ORDER BY r.generated_at DESC
+    `) as Report[]
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user?.id).single()
-
-  // Fetch districts
-  const { data: districts } = await supabase.from("districts").select("*").order("name")
-
-  // Fetch all projects with progress data
-  const { data: projects } = await supabase
-    .from("projects")
-    .select(`
-      *,
-      district:districts(id, name, code),
-      creator:profiles(full_name),
-      sections:project_sections(
-        *,
-        trades(*)
-      )
+    // Fetch projects for the filter dropdown
+    const projects = await query(`
+      SELECT id, contract_name as name 
+      FROM projects 
+      ORDER BY contract_name
     `)
-    .order("created_at", { ascending: false })
 
-  // Fetch progress data for calculating overall progress
-  const { data: progressReports } = await supabase
-    .from("progress_reports")
-    .select(`
-      *,
-      trade_progress(*)
+    // Get report types for the filter
+    const reportTypes = await query(`
+      SELECT DISTINCT type 
+      FROM reports 
+      WHERE type IS NOT NULL
+      ORDER BY type
     `)
-    .order("report_no", { ascending: false })
 
-  // Fetch document counts per project
-  const { data: documentCounts } = await supabase.from("documents").select("project_id, document_type")
-
-  return (
-    <div className="min-h-screen">
-      <Header title="Reports" subtitle="View comprehensive project reports and analytics" />
-      <div className="p-6">
-        <ReportsView
-          districts={districts || []}
-          projects={projects || []}
-          progressReports={progressReports || []}
-          documentCounts={documentCounts || []}
-          userRole={profile?.role || "viewer"}
+    return (
+      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+        <Header
+          title="Reports"
+          description="View and generate project reports"
         />
+        <div className="rounded-md border">
+          <div className="p-4 border-b">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="w-full sm:w-auto">
+                <input
+                  type="text"
+                  placeholder="Search reports..."
+                  className="w-full px-4 py-2 border rounded-md"
+                />
+              </div>
+              <div className="w-full sm:w-auto flex gap-2">
+                <select className="px-4 py-2 border rounded-md">
+                  <option value="">All Projects</option>
+                  {Array.isArray(projects) && projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+                <select className="px-4 py-2 border rounded-md">
+                  <option value="">All Types</option>
+                  {Array.isArray(reportTypes) && reportTypes.map((type) => (
+                    <option key={type.type} value={type.type}>
+                      {type.type.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Title
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Project
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Generated By
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {Array.isArray(reports) && reports.length > 0 ? (
+                  reports.map((report) => (
+                    <tr key={report.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {report.title}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {report.project_name || 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                          {report.type.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {report.generated_by_name || 'System'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(report.generated_at).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          report.status === 'completed'
+                            ? 'bg-green-100 text-green-800'
+                            : report.status === 'failed'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <a
+                          href={report.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-900 mr-4"
+                        >
+                          View
+                        </a>
+                        <a
+                          href={report.url}
+                          download
+                          className="text-gray-600 hover:text-gray-900"
+                        >
+                          Download
+                        </a>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">
+                      No reports found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
-    </div>
-  )
+    )
+  } catch (error) {
+    console.error('Error loading reports:', error)
+    return (
+      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+        <Header
+          title="Reports"
+          description="Error loading reports"
+        />
+        <div className="text-red-500">Failed to load reports. Please try again later.</div>
+      </div>
+    )
+  }
 }

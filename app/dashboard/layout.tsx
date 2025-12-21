@@ -1,39 +1,56 @@
-import type React from "react"
-import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { Sidebar } from "@/components/dashboard/sidebar"
-import type { Profile } from "@/lib/types"
+"use client"
 
-export default async function DashboardLayout({
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { Sidebar } from "@/components/dashboard/sidebar"
+
+interface Profile {
+  id: string
+  name: string
+  email: string
+  role: string
+  district_id?: number
+}
+
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
+  const router = useRouter()
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
+  useEffect(() => {
+    // Check if user is authenticated
+    const user = localStorage.getItem('user')
+    if (!user) {
+      router.push('/auth/login')
+      return
+    }
 
-  if (error || !user) {
-    redirect("/auth/login")
-  }
+    try {
+      const userData = JSON.parse(user)
+      setProfile(userData)
+    } catch (error) {
+      console.error('Error parsing user data:', error)
+      router.push('/auth/login')
+    } finally {
+      setLoading(false)
+    }
+  }, [router])
 
-  // Fetch user profile
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*, district:districts(*)")
-    .eq("id", user.id)
-    .single()
-
-  if (!profile) {
-    redirect("/auth/login")
+  if (loading || !profile) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#E87A1E] border-t-transparent" />
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar profile={profile as Profile} />
+      <Sidebar profile={profile} />
       <main className="lg:pl-64 transition-all duration-300">{children}</main>
     </div>
   )

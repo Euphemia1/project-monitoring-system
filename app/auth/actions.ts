@@ -1,9 +1,9 @@
 'use server';
 
 import { query } from '@/lib/db';
-import { authenticateUser } from '@/lib/auth';
 import bcrypt from 'bcrypt';
 
+// Get districts (if needed)
 export async function getDistricts() {
   try {
     const districts: any[] = await query('SELECT * FROM districts ORDER BY name');
@@ -14,59 +14,75 @@ export async function getDistricts() {
   }
 }
 
+// Login action
 export async function loginAction(email: string, password: string) {
   try {
-    const result = await authenticateUser(email, password);
-    if (!result) {
-      return { success: false, error: "Invalid email or password" };
-    }
-    return { success: true, token: result.token, user: result.user };
+    // Fetch user by email who is active
+    const users: any[] = await query(`
+      SELECT * FROM users 
+      WHERE email = ? AND is_active = 1
+    `, [email]);
+    
+    if (!users.length) return { success: false, error: 'Invalid email or password' };
+
+    const user = users[0];
+
+    // Compare password with hashed password
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) return { success: false, error: 'Invalid email or password' };
+
+    // Return user data
+    return {
+      success: true,
+      token: Math.random().toString(36).substring(2),
+      user: { 
+        id: user.id, 
+        name: user.name,  // Changed from full_name to name
+        email: user.email, 
+        role: user.role  // Using the role column directly
+      }
+    };
   } catch (error) {
     console.error('Login error:', error);
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : "An error occurred" 
+      error: error instanceof Error ? error.message : 'Login failed' 
     };
   }
 }
-
+// Sign-up action
 export async function signUpAction(formData: {
   name: string;
   email: string;
   password: string;
   role: string;
-  district_id?: number;
+  district_id?: number | null;
+  phone?: string | null;
 }) {
   try {
     // Check if user already exists
-    const existingUser: any[] = await query(
-      'SELECT * FROM users WHERE email = ?',
-      [formData.email]
-    );
-
-    if (existingUser.length > 0) {
-      return { success: false, error: 'Email already registered' };
-    }
+    const existingUser: any[] = await query('SELECT * FROM users WHERE email = ?', [formData.email]);
+    if (existingUser.length > 0) return { success: false, error: 'Email already registered' };
 
     // Hash password
     const hashedPassword = await bcrypt.hash(formData.password, 10);
 
     // Insert new user
     const result: any = await query(
-      'INSERT INTO users (name, email, password, role, district_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
-      [formData.name, formData.email, hashedPassword, formData.role, formData.district_id || null]
+      'INSERT INTO users (name, email, password, role, district_id, phone, created_at, is_active) VALUES (?, ?, ?, ?, ?, ?, NOW(), 1)',
+      [
+        formData.name,
+        formData.email,
+        hashedPassword,
+        formData.role,
+        formData.district_id || null,
+        formData.phone || null
+      ]
     );
 
-    return { 
-      success: true, 
-      message: 'Account created successfully! Please wait for admin approval.',
-      userId: result.insertId 
-    };
+    return { success: true, message: 'Account created successfully!', userId: result.insertId };
   } catch (error) {
     console.error('Sign up error:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Failed to create account" 
-    };
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to create account' };
   }
 }
