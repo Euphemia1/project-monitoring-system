@@ -37,7 +37,7 @@ export default function NewProjectPage() {
         setUserRole(role)
         setUserId(id)
 
-        if (role !== 'director' && role !== 'project_engineer') {
+        if (role !== 'director' && role !== 'project_engineer' && role !== 'project_manager') {
           router.push('/dashboard/projects')
           return
         }

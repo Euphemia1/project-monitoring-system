@@ -61,11 +61,27 @@ export default function ProjectsPage() {
       let currentUserId = userId
 
       if (typeof window !== 'undefined') {
-        const user = JSON.parse(localStorage.getItem('user') || '{}')
-        currentUserRole = user?.role || 'viewer'
-        currentUserId = user?.id || null
-        setUserRole(currentUserRole)
-        setUserId(currentUserId)
+        const userStr = localStorage.getItem('user')
+        if (userStr) {
+          try {
+            const user = JSON.parse(userStr)
+            console.log('DEBUG: User data from localStorage:', user);
+            currentUserRole = user?.role || 'viewer'
+            currentUserId = user?.id || null
+            console.log('DEBUG: Setting user role to:', currentUserRole);
+            setUserRole(currentUserRole)
+            setUserId(currentUserId)
+          } catch (parseError) {
+            console.error('Error parsing user data:', parseError)
+            // Redirect to login if user data is corrupted
+            router.push('/auth/login')
+            return
+          }
+        } else {
+          // Redirect to login if no user data
+          router.push('/auth/login')
+          return
+        }
       }
 
       const projectsRes = await fetch('/api/projects', {
@@ -75,9 +91,32 @@ export default function ProjectsPage() {
           'Pragma': 'no-cache'
         }
       })
-      if (!projectsRes.ok) throw new Error('Failed to fetch projects')
+      
+      // Handle authentication errors
+      if (projectsRes.status === 401) {
+        // Token expired or invalid, redirect to login
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('user')
+          document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+        }
+        router.push('/auth/login')
+        return
+      }
+      
+      if (!projectsRes.ok) {
+        const errorText = await projectsRes.text()
+        console.error('API Error:', errorText)
+        throw new Error(`Failed to fetch projects: ${projectsRes.status} ${projectsRes.statusText}`)
+      }
 
-      let projectsData = await projectsRes.json()
+      let projectsData
+      try {
+        projectsData = await projectsRes.json()
+      } catch (jsonError) {
+        const errorText = await projectsRes.text()
+        console.error('Invalid JSON response:', errorText)
+        throw new Error('Invalid response from server')
+      }
 
       // Filter non-directors to their own created projects (until assignment tables are implemented)
       if (currentUserRole !== 'director' && currentUserId) {
@@ -90,8 +129,33 @@ export default function ProjectsPage() {
       const districtsRes = await fetch('/api/districts', {
         credentials: 'include'
       })
-      if (!districtsRes.ok) throw new Error('Failed to fetch districts')
-      const districtsData = await districtsRes.json()
+      
+      // Handle authentication errors for districts
+      if (districtsRes.status === 401) {
+        // Token expired or invalid, redirect to login
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('user')
+          document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+        }
+        router.push('/auth/login')
+        return
+      }
+      
+      if (!districtsRes.ok) {
+        const errorText = await districtsRes.text()
+        console.error('Districts API Error:', errorText)
+        throw new Error(`Failed to fetch districts: ${districtsRes.status} ${districtsRes.statusText}`)
+      }
+      
+      let districtsData
+      try {
+        districtsData = await districtsRes.json()
+      } catch (jsonError) {
+        const errorText = await districtsRes.text()
+        console.error('Invalid JSON response from districts:', errorText)
+        throw new Error('Invalid response from districts server')
+      }
+      
       setDistricts(districtsData)
 
     } catch (err) {
@@ -138,7 +202,8 @@ export default function ProjectsPage() {
     fetchData()
   }
 
-  const canCreateProject = userRole === 'project_engineer' || userRole === 'director'
+  // Moved inside component to ensure it reacts to userRole changes
+  // This will be defined in the render section
 
   if (isLoading && !isRefreshing) {
     return (
@@ -168,6 +233,10 @@ export default function ProjectsPage() {
       </div>
     )
   }
+
+  // Define canCreateProject inside the render section to ensure it reacts to userRole changes
+  console.log('DEBUG: Current user role:', userRole);
+  const canCreateProject = userRole === 'project_engineer' || userRole === 'director' || userRole === 'project_manager'
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
