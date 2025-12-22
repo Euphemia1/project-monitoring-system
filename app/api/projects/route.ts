@@ -10,26 +10,7 @@ export async function GET(request: Request) {
 
     if (id) {
       const rows: any[] = await query(
-        `SELECT 
-          p.id,
-          p.contract_no,
-          p.contract_name,
-          p.district_id,
-          p.start_date,
-          p.completion_date,
-          p.contract_sum,
-          p.status,
-          p.created_by,
-          p.created_at,
-          p.updated_at,
-          d.name as district_name,
-          d.code as district_code,
-          COALESCE(u.full_name, u.name) as creator_full_name
-        FROM projects p
-        LEFT JOIN districts d ON d.id = p.district_id
-        LEFT JOIN users u ON u.id = p.created_by
-        WHERE p.id = ?
-        LIMIT 1`,
+        `SELECT p.id, p.contract_no, p.contract_name, p.district_id, p.start_date, p.completion_date, p.contract_sum, p.status, p.created_by, p.created_at, p.updated_at, d.name as district_name, d.code as district_code, COALESCE(u.name, u.full_name, u.email) as creator_full_name FROM projects p LEFT JOIN districts d ON d.id = p.district_id LEFT JOIN users u ON u.id = p.created_by WHERE p.id = ? LIMIT 1`,
         [id]
       )
 
@@ -63,26 +44,13 @@ export async function GET(request: Request) {
             }
           : null,
       }
-
-      const sections: any[] = await query(
-        `SELECT id, project_id, section_name, house_type, created_at
-         FROM project_sections
-         WHERE project_id = ?
-         ORDER BY id ASC`,
-        [id]
-      )
+const sections: any[] = await query('SELECT id, project_id, section_name, house_type, created_at FROM project_sections WHERE project_id = ? ORDER BY id ASC', [id])
 
       const sectionIds = sections.map((s) => s.id)
       let trades: any[] = []
       if (sectionIds.length > 0) {
         const placeholders = sectionIds.map(() => '?').join(',')
-        trades = await query(
-          `SELECT id, section_id, trade_name, amount, created_at
-           FROM trades
-           WHERE section_id IN (${placeholders})
-           ORDER BY id ASC`,
-          sectionIds
-        )
+        trades = await query(`SELECT id, section_id, trade_name, amount, created_at FROM trades WHERE section_id IN (${placeholders}) ORDER BY id ASC`, sectionIds)
       }
 
       const sectionsWithTrades = sections.map((s) => ({
@@ -106,25 +74,7 @@ export async function GET(request: Request) {
     }
 
     const rows: any[] = await query(
-      `SELECT 
-        p.id,
-        p.contract_no,
-        p.contract_name,
-        p.district_id,
-        p.start_date,
-        p.completion_date,
-        p.contract_sum,
-        p.status,
-        p.created_by,
-        p.created_at,
-        p.updated_at,
-        d.name as district_name,
-        d.code as district_code,
-        COALESCE(u.full_name, u.name) as creator_full_name
-      FROM projects p
-      LEFT JOIN districts d ON d.id = p.district_id
-      LEFT JOIN users u ON u.id = p.created_by
-      ORDER BY p.created_at DESC`
+      `SELECT p.id, p.contract_no, p.contract_name, p.district_id, p.start_date, p.completion_date, p.contract_sum, p.status, p.created_by, p.created_at, p.updated_at, d.name as district_name, d.code as district_code, COALESCE(u.name, u.full_name, u.email) as creator_full_name FROM projects p LEFT JOIN districts d ON d.id = p.district_id LEFT JOIN users u ON u.id = p.created_by ORDER BY p.created_at DESC`
     )
 
     const projects = rows.map((r) => ({
@@ -190,16 +140,7 @@ export async function POST(request: Request) {
 
     const created = await transaction(async (connection) => {
       const [projectResult]: any = await connection.execute(
-        `INSERT INTO projects (
-          contract_no,
-          contract_name,
-          district_id,
-          start_date,
-          completion_date,
-          contract_sum,
-          status,
-          created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)` ,
+        `INSERT INTO projects (contract_no, contract_name, district_id, start_date, completion_date, contract_sum, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           contract_no,
           contract_name,
@@ -212,6 +153,7 @@ export async function POST(request: Request) {
         ]
       )
 
+      
       const projectId = projectResult.insertId
 
       for (const section of sections || []) {
@@ -246,6 +188,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create project' }, { status: 500 })
   }
 }
+
 
 export async function DELETE(request: Request) {
   try {
