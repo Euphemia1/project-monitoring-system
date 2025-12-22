@@ -4,7 +4,6 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -57,14 +56,14 @@ export function ProjectDetails({
     project.status !== "pending_approval"
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-ZM", {
+    return new Intl.NumberFormat("en-GH", {
       style: "currency",
-      currency: "ZMW",
+      currency: "GHS",
     }).format(amount)
   }
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-ZM", {
+    return new Date(date).toLocaleDateString("en-GH", {
       day: "numeric",
       month: "long",
       year: "numeric",
@@ -87,22 +86,23 @@ export function ProjectDetails({
 
   const handleApprove = async () => {
     setIsApproving(true)
-    const supabase = createClient()
-
     try {
-      const { error } = await supabase
-        .from("projects")
-        .update({
-          status: "approved",
-          approved_by: userId,
-          approved_at: new Date().toISOString(),
-        })
-        .eq("id", project.id)
+      const res = await fetch(`/api/projects?id=${encodeURIComponent(project.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'approved' })
+      })
 
-      if (error) throw error
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to approve project')
+      }
+
       router.refresh()
     } catch (error) {
       console.error("Failed to approve project:", error)
+      window.alert(error instanceof Error ? error.message : 'Failed to approve project')
     } finally {
       setIsApproving(false)
     }

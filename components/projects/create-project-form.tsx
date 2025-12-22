@@ -1,17 +1,19 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Loader2, Plus, Trash2, Building2 } from "lucide-react"
-import type { District } from "@/lib/types"
+
+interface District {
+  id: string
+  name: string
+  code: string
+}
 
 interface CreateProjectFormProps {
   districts: District[]
@@ -49,6 +51,7 @@ export function CreateProjectForm({ districts, userId }: CreateProjectFormProps)
   const [districtId, setDistrictId] = useState("")
   const [startDate, setStartDate] = useState("")
   const [completionDate, setCompletionDate] = useState("")
+  const [description, setDescription] = useState("")
 
   // Sections with Trades
   const [sections, setSections] = useState<Section[]>([
@@ -132,65 +135,61 @@ export function CreateProjectForm({ districts, userId }: CreateProjectFormProps)
     setIsLoading(true)
     setError(null)
 
-    const supabase = createClient()
-
     try {
       // Create the project
-      const { data: project, error: projectError } = await supabase
-        .from("projects")
-        .insert({
-          contract_no: contractNo,
-          contract_name: contractName,
-          district_id: districtId,
-          start_date: startDate,
-          completion_date: completionDate,
-          contract_sum: calculateContractSum(),
-          status: "pending_approval",
-          created_by: userId,
-        })
-        .select()
-        .single()
-
-      if (projectError) throw projectError
-
-      // Create sections and trades
-      for (const section of sections) {
-        const { data: sectionData, error: sectionError } = await supabase
-          .from("project_sections")
-          .insert({
-            project_id: project.id,
-            section_name: section.name,
-            house_type: section.houseType,
-          })
-          .select()
-          .single()
-
-        if (sectionError) throw sectionError
-
-        // Create trades for this section
-        const tradesWithSection = section.trades
-          .filter((t) => t.name && t.amount)
-          .map((trade) => ({
-            section_id: sectionData.id,
-            trade_name: trade.name,
-            amount: Number.parseFloat(trade.amount) || 0,
-          }))
-
-        if (tradesWithSection.length > 0) {
-          const { error: tradesError } = await supabase.from("trades").insert(tradesWithSection)
-
-          if (tradesError) throw tradesError
-        }
+      const projectData = {
+        contract_no: contractNo,
+        contract_name: contractName,
+        description,
+        district_id: districtId,
+        start_date: startDate,
+        completion_date: completionDate,
+        contract_sum: calculateContractSum(),
+        status: "pending_approval",
+        created_by: userId,
+        sections: sections.map(section => ({
+          name: section.name,
+          house_type: section.houseType,
+          trades: section.trades
+            .filter(t => t.name && t.amount)
+            .map(trade => ({
+              name: trade.name,
+              amount: parseFloat(trade.amount) || 0
+            }))
+        }))
       }
+
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(projectData),
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to create project')
+      }
+
+      const project = await response.json()
+      window.alert('Project created successfully')
 
       router.push(`/dashboard/projects/${project.id}`)
       router.refresh()
     } catch (err) {
+      console.error('Error creating project:', err)
       setError(err instanceof Error ? err.message : "Failed to create project")
+      window.alert('Failed to create project. Please try again.')
     } finally {
       setIsLoading(false)
     }
   }
+
+  // ... rest of the component remains the same until the return statement
+  // The JSX part of the component can remain exactly the same
+  // since we're only changing the data handling logic
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl">
@@ -225,6 +224,18 @@ export function CreateProjectForm({ districts, userId }: CreateProjectFormProps)
                 required
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Project Description</Label>
+            <textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              placeholder="Enter project description..."
+              rows={3}
+            />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -321,7 +332,7 @@ export function CreateProjectForm({ districts, userId }: CreateProjectFormProps)
                   <thead>
                     <tr className="border-b border-border bg-muted/50">
                       <th className="px-4 py-2 text-left text-sm font-medium text-foreground">Trade</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium text-foreground">Amount (ZMW)</th>
+                      <th className="px-4 py-2 text-right text-sm font-medium text-foreground">Amount (GHS)</th>
                       <th className="px-4 py-2 w-12"></th>
                     </tr>
                   </thead>
@@ -376,9 +387,9 @@ export function CreateProjectForm({ districts, userId }: CreateProjectFormProps)
                     <tr className="bg-muted/50">
                       <td className="px-4 py-2 font-medium text-foreground">Section Total</td>
                       <td className="px-4 py-2 text-right font-mono font-semibold text-foreground">
-                        {new Intl.NumberFormat("en-ZM", {
+                        {new Intl.NumberFormat("en-GH", {
                           style: "currency",
-                          currency: "ZMW",
+                          currency: "GHS",
                         }).format(section.trades.reduce((sum, t) => sum + (Number.parseFloat(t.amount) || 0), 0))}
                       </td>
                       <td></td>
@@ -404,9 +415,9 @@ export function CreateProjectForm({ districts, userId }: CreateProjectFormProps)
             <div className="flex items-center justify-between">
               <span className="text-lg font-semibold text-foreground">Total Contract Sum</span>
               <span className="text-2xl font-bold text-[#E87A1E] font-mono">
-                {new Intl.NumberFormat("en-ZM", {
+                {new Intl.NumberFormat("en-GH", {
                   style: "currency",
-                  currency: "ZMW",
+                  currency: "GHS",
                 }).format(calculateContractSum())}
               </span>
             </div>
@@ -422,7 +433,11 @@ export function CreateProjectForm({ districts, userId }: CreateProjectFormProps)
         <Button type="button" variant="outline" onClick={() => router.back()} disabled={isLoading}>
           Cancel
         </Button>
-        <Button type="submit" className="bg-[#E87A1E] text-white hover:bg-[#D16A0E]" disabled={isLoading}>
+        <Button 
+          type="submit" 
+          className="bg-[#E87A1E] text-white hover:bg-[#D16A0E]" 
+          disabled={isLoading}
+        >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

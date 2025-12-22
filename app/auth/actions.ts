@@ -2,6 +2,9 @@
 
 import { query } from '@/lib/db';
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
 
 // Get districts (if needed)
 export async function getDistricts() {
@@ -31,15 +34,27 @@ export async function loginAction(email: string, password: string) {
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) return { success: false, error: 'Invalid email or password' };
 
-    // Return user data
+    // Create JWT token with user data
+    const token = jwt.sign(
+      { 
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name
+      },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Return user data with JWT token
     return {
       success: true,
-      token: Math.random().toString(36).substring(2),
+      token: token,
       user: { 
         id: user.id, 
-        name: user.name,  // Changed from full_name to name
+        name: user.name,
         email: user.email, 
-        role: user.role  // Using the role column directly
+        role: user.role
       }
     };
   } catch (error) {

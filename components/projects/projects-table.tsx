@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Eye, Plus, Search, Filter } from "lucide-react"
+import { Eye, Plus, Search, Filter, Pencil, Trash2 } from "lucide-react"
 import type { Project, District, UserRole } from "@/lib/types"
 
 interface ProjectsTableProps {
@@ -18,14 +18,43 @@ interface ProjectsTableProps {
   })[]
   districts: District[]
   userRole: UserRole
+  onProjectUpdated?: () => void
 }
 
-export function ProjectsTable({ projects, districts, userRole }: ProjectsTableProps) {
+export function ProjectsTable({ projects, districts, userRole, onProjectUpdated }: ProjectsTableProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedDistrict, setSelectedDistrict] = useState<string>("all")
   const [selectedStatus, setSelectedStatus] = useState<string>("all")
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
 
   const canCreateProject = userRole === "director" || userRole === "project_engineer"
+  const canEditProject = userRole === "director" || userRole === "project_engineer"
+  const canDeleteProject = userRole === "director"
+
+  const handleDelete = async (projectId: string) => {
+    const ok = window.confirm('Delete this project? This cannot be undone.')
+    if (!ok) return
+
+    try {
+      setDeletingProjectId(projectId)
+      const res = await fetch(`/api/projects?id=${encodeURIComponent(projectId)}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      })
+
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to delete project')
+      }
+
+      onProjectUpdated?.()
+    } catch (e) {
+      console.error('Delete project failed:', e)
+      alert(e instanceof Error ? e.message : 'Failed to delete project')
+    } finally {
+      setDeletingProjectId(null)
+    }
+  }
 
   const filteredProjects = projects.filter((project) => {
     const matchesSearch =
@@ -48,15 +77,15 @@ export function ProjectsTable({ projects, districts, userRole }: ProjectsTablePr
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-ZM", {
+    return new Intl.NumberFormat("en-GH", {
       style: "currency",
-      currency: "ZMW",
+      currency: "GHS",
       minimumFractionDigits: 2,
     }).format(amount)
   }
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-ZM", {
+    return new Date(date).toLocaleDateString("en-GH", {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -151,11 +180,32 @@ export function ProjectsTable({ projects, districts, userRole }: ProjectsTablePr
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Link href={`/dashboard/projects/${project.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4 mr-1" /> View
-                        </Button>
-                      </Link>
+                      <div className="flex items-center justify-center gap-1">
+                        <Link href={`/dashboard/projects/${project.id}`}>
+                          <Button variant="ghost" size="sm">
+                            <Eye className="h-4 w-4 mr-1" /> View
+                          </Button>
+                        </Link>
+
+                        {canEditProject && (
+                          <Button variant="ghost" size="sm" disabled title="Edit coming soon">
+                            <Pencil className="h-4 w-4 mr-1" /> Edit
+                          </Button>
+                        )}
+
+                        {canDeleteProject && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive"
+                            onClick={() => handleDelete(project.id)}
+                            disabled={deletingProjectId === project.id}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            {deletingProjectId === project.id ? 'Deleting…' : 'Delete'}
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

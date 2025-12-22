@@ -1,83 +1,99 @@
-import { notFound, redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+"use client"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Header } from "@/components/dashboard/header"
 import { ProjectDetails } from "@/components/projects/project-details"
+import type { Project, ProjectSection, Trade, UserRole } from "@/lib/types"
 
 interface PageProps {
-  params: Promise<{ id: string }>
+  params: { id: string }
 }
 
-export default async function ProjectPage({ params }: PageProps) {
-  const { id } = await params
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/auth/login")
+type ProjectApiResponse = {
+  project: Project & {
+    district?: { name: string } | null
+    creator?: { id: string; full_name: string; email?: string; role?: string } | null
   }
+  sections: (ProjectSection & { trades: Trade[] })[]
+}
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+export default function ProjectPage({ params }: PageProps) {
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<UserRole>('viewer')
+  const [userId, setUserId] = useState<string>('')
+  const [project, setProject] = useState<ProjectApiResponse['project'] | null>(null)
+  const [sections, setSections] = useState<ProjectApiResponse['sections']>([])
 
-  // Fetch project with all related data
-  const { data: project, error } = await supabase
-    .from("projects")
-    .select(`
-      *,
-      district:districts(*),
-      creator:profiles!projects_created_by_fkey(id, full_name, email, role),
-      approver:profiles!projects_approved_by_fkey(id, full_name)
-    `)
-    .eq("id", id)
-    .single()
+  useEffect(() => {
+    const load = async () => {
+      try {
+        if (typeof window !== 'undefined') {
+          const raw = localStorage.getItem('user')
+          if (!raw) {
+            router.push('/auth/login')
+            return
+          }
+
+          const user = JSON.parse(raw)
+          setUserRole((user?.role || 'viewer') as UserRole)
+          setUserId(user?.id?.toString?.() ?? '')
+        }
+
+        const res = await fetch(`/api/projects?id=${encodeURIComponent(params.id)}`, {
+          credentials: 'include',
+          cache: 'no-store'
+        })
+
+        if (!res.ok) {
+          throw new Error('Failed to load project')
+        }
+
+        const data: ProjectApiResponse = await res.json()
+        setProject(data.project)
+        setSections(data.sections || [])
+      } catch (e) {
+        console.error('Failed to load project:', e)
+        setError(e instanceof Error ? e.message : 'Failed to load project')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    load()
+  }, [params.id, router])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#E87A1E] border-t-transparent" />
+        </div>
+      </div>
+    )
+  }
 
   if (error || !project) {
-    notFound()
+    return (
+      <div className="min-h-screen p-6">
+        <div className="text-red-500">{error || 'Project not found'}</div>
+      </div>
+    )
   }
-
-  // Fetch sections with trades
-  const { data: sections } = await supabase
-    .from("project_sections")
-    .select(`
-      *,
-      trades(*)
-    `)
-    .eq("project_id", id)
-    .order("created_at")
-
-  // Fetch progress reports
-  const { data: progressReports } = await supabase
-    .from("progress_reports")
-    .select(`
-      *,
-      creator:profiles(full_name)
-    `)
-    .eq("project_id", id)
-    .order("report_no", { ascending: false })
-
-  // Fetch documents grouped by type
-  const { data: documents } = await supabase
-    .from("documents")
-    .select(`
-      *,
-      uploader:profiles(full_name)
-    `)
-    .eq("project_id", id)
-    .order("created_at", { ascending: false })
 
   return (
     <div className="min-h-screen">
       <Header title={project.contract_name} subtitle={`Contract No: ${project.contract_no}`} />
       <div className="p-6">
         <ProjectDetails
-          project={project}
-          sections={sections || []}
-          progressReports={progressReports || []}
-          documents={documents || []}
-          userRole={profile?.role || "viewer"}
-          userId={user.id}
+          project={project as any}
+          sections={sections}
+          progressReports={[] as any}
+          documents={[] as any}
+          userRole={userRole}
+          userId={userId}
         />
       </div>
     </div>

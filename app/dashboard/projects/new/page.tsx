@@ -1,29 +1,77 @@
-import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+"use client"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Header } from "@/components/dashboard/header"
 import { CreateProjectForm } from "@/components/projects/create-project-form"
 
-export default async function NewProjectPage() {
-  const supabase = await createClient()
+interface District {
+  id: string
+  name: string
+  code: string
+}
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+export default function NewProjectPage() {
+  const router = useRouter()
+  const [districts, setDistricts] = useState<District[]>([])
+  const [userId, setUserId] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string>('viewer')
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user?.id).single()
+  useEffect(() => {
+    const init = async () => {
+      try {
+        if (typeof window === 'undefined') return
 
-  // Only directors and project engineers can create projects
-  if (profile?.role !== "director" && profile?.role !== "project_engineer") {
-    redirect("/dashboard/projects")
-  }
+        const raw = localStorage.getItem('user')
+        if (!raw) {
+          router.push('/auth/login')
+          return
+        }
 
-  const { data: districts } = await supabase.from("districts").select("*").order("name")
+        const user = JSON.parse(raw)
+        const role = user?.role || 'viewer'
+        const id = user?.id || null
+
+        setUserRole(role)
+        setUserId(id)
+
+        if (role !== 'director' && role !== 'project_engineer') {
+          router.push('/dashboard/projects')
+          return
+        }
+
+        const res = await fetch('/api/districts', { credentials: 'include' })
+        if (!res.ok) throw new Error('Failed to load districts')
+        const data = await res.json()
+        setDistricts(data)
+      } catch (e) {
+        console.error('Failed to initialize NewProjectPage:', e)
+        setError(e instanceof Error ? e.message : 'Failed to load page')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    init()
+  }, [router])
 
   return (
     <div className="min-h-screen">
       <Header title="Create New Project" subtitle="Fill in the project details below" />
       <div className="p-6">
-        <CreateProjectForm districts={districts || []} userId={user?.id || ""} />
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#E87A1E] border-t-transparent" />
+          </div>
+        ) : error ? (
+          <div className="text-red-500">{error}</div>
+        ) : !userId ? (
+          <div className="text-red-500">You must be logged in to create a project.</div>
+        ) : (
+          <CreateProjectForm districts={districts} userId={userId} />
+        )}
       </div>
     </div>
   )

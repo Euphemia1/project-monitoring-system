@@ -25,16 +25,32 @@ export async function updateSession(request: NextRequest) {
   // If we have a token, verify it
   if (token) {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      // Token is valid, we can attach user info to headers if needed
-      response.headers.set("x-user-id", (decoded as any).userId);
+      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; role: string; email: string; name: string };
+      
+      // Attach user info to headers for API routes
+      response.headers.set("x-user-id", decoded.userId);
+      response.headers.set("x-user-role", decoded.role);
+      response.headers.set("x-user-email", decoded.email);
+      response.headers.set("x-user-name", decoded.name);
+      
+      // Set user data in cookies for client-side access
+      response.cookies.set('user-role', decoded.role, {
+        httpOnly: false, // Allow client-side access
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+      });
+      
     } catch (error) {
+      console.error('Token verification failed:', error);
       // Token is invalid, clear it and redirect to login if not on public route
       if (!isPublicRoute) {
         const url = request.nextUrl.clone();
         url.pathname = "/auth/login";
         const redirectResponse = NextResponse.redirect(url);
+        // Clear all auth-related cookies
         redirectResponse.cookies.delete("auth-token");
+        redirectResponse.cookies.delete('user-role');
         return redirectResponse;
       }
     }
