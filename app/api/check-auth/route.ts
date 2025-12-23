@@ -1,4 +1,5 @@
 // app/api/check-auth/route.ts
+// Force recompilation
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
@@ -44,14 +45,17 @@ export async function GET() {
       );
     }
 
+    // Ensure the user object has all required properties
+    const userData = {
+      id: user.id,
+      name: user.name || user.email,
+      email: user.email,
+      role: user.role,
+    };
+
     return NextResponse.json({
       authenticated: true,
-      user: {
-        id: user.id,
-        name: (user as any).name || (user as any).full_name || user.email,
-        email: user.email,
-        role: user.role,
-      }
+      user: userData
     });
 
   } catch (error) {

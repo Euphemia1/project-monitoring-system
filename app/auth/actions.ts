@@ -18,13 +18,11 @@ export async function getDistricts() {
 }
 
 // Login action
+// Force recompilation
 export async function loginAction(email: string, password: string) {
   try {
     // Fetch user by email who is active
-    const users: any[] = await query(`
-      SELECT * FROM users 
-      WHERE email = ? AND is_active = 1
-    `, [email]);
+    const users: any[] = await query('SELECT * FROM users WHERE email = ? AND is_active = 1', [email]);
     
     if (!users.length) return { success: false, error: 'Invalid email or password' };
 
@@ -40,7 +38,7 @@ export async function loginAction(email: string, password: string) {
         userId: user.id,
         email: user.email,
         role: user.role,
-        name: user.name
+        name: user.name || user.email
       },
       JWT_SECRET,
       { expiresIn: '7d' }
@@ -52,7 +50,7 @@ export async function loginAction(email: string, password: string) {
       token: token,
       user: { 
         id: user.id, 
-        name: user.name,
+        name: user.name || user.email,
         email: user.email, 
         role: user.role
       }
@@ -85,14 +83,7 @@ export async function signUpAction(formData: {
     // Insert new user
     const result: any = await query(
       'INSERT INTO users (name, email, password, role, district_id, phone, created_at, is_active) VALUES (?, ?, ?, ?, ?, ?, NOW(), 1)',
-      [
-        formData.name,
-        formData.email,
-        hashedPassword,
-        formData.role,
-        formData.district_id || null,
-        formData.phone || null
-      ]
+      [formData.name, formData.email, hashedPassword, formData.role, formData.district_id || null, formData.phone || null]
     );
 
     return { success: true, message: 'Account created successfully!', userId: result.insertId };

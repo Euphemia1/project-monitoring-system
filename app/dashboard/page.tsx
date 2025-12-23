@@ -16,9 +16,10 @@ import {
   ArrowRightIcon,
   Building2Icon,
   AlertTriangleIcon,
-  Loader2Icon
+  Loader2Icon,
+  PlusIcon
 } from "@/components/icons"
-import { query } from "@/lib/db"
+import { hasPermission } from "@/lib/rbac"
 
 // Helper function to safely execute queries
 async function safeQuery(sql: string, params: any[] = []) {
@@ -77,22 +78,8 @@ export default function DashboardPage() {
           safeQuery('SELECT COUNT(*) as count FROM projects WHERE status = ?', ['pending_approval']),
           safeQuery('SELECT COUNT(*) as count FROM projects WHERE status = ?', ['in_progress']),
           safeQuery('SELECT COUNT(*) as count FROM documents'),
-          safeQuery(`
-            SELECT p.*, d.name as district_name, u.name as creator_name
-            FROM projects p
-            LEFT JOIN districts d ON p.district_id = d.id
-            LEFT JOIN users u ON p.created_by = u.id
-            ORDER BY p.created_at DESC
-            LIMIT 5
-          `),
-          safeQuery(`
-            SELECT pr.*, p.contract_name as project_contract_name, u.name as creator_name
-            FROM progress_reports pr
-            LEFT JOIN projects p ON pr.project_id = p.id
-            LEFT JOIN users u ON pr.created_by = u.id
-            ORDER BY pr.created_at DESC
-            LIMIT 5
-          `)
+          safeQuery('SELECT p.*, d.name as district_name, u.name as creator_name FROM projects p LEFT JOIN districts d ON p.district_id = d.id LEFT JOIN users u ON p.created_by = u.id ORDER BY p.created_at DESC LIMIT 5'),
+          safeQuery('SELECT pr.*, p.contract_name as project_contract_name, u.name as creator_name FROM progress_reports pr LEFT JOIN projects p ON pr.project_id = p.id LEFT JOIN users u ON pr.created_by = u.id ORDER BY pr.created_at DESC LIMIT 5')
         ]);
 
         // Update stats
@@ -107,6 +94,7 @@ export default function DashboardPage() {
         if (recentProjectsData.data) {
           setRecentProjects(recentProjectsData.data.map(project => ({
             ...project,
+            contract_name: project.contract_name,
             district: { name: project.district_name },
             creator: { full_name: project.creator_name }
           })));
@@ -166,6 +154,18 @@ export default function DashboardPage() {
       />
 
       <div className="p-6 space-y-6">
+        {/* Quick Actions - Only show if user has create_project permission */}
+        {hasPermission(profile, 'create_project') && (
+          <div className="flex gap-4">
+            <Link href="/dashboard/projects/new">
+              <Button className="bg-[#E87A1E] hover:bg-[#D16A0E]">
+                <PlusIcon className="mr-2 h-4 w-4" />
+                Create New Project
+              </Button>
+            </Link>
+          </div>
+        )}
+
         {/* Stats Grid */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <StatsCard
@@ -209,7 +209,7 @@ export default function DashboardPage() {
                   {recentProjects.map((project) => (
                     <div key={project.id} className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">{project.name}</p>
+                        <p className="font-medium">{project.contract_name || project.name}</p>
                         <p className="text-sm text-muted-foreground">
                           {project.district?.name || 'No district'}
                         </p>
@@ -224,6 +224,14 @@ export default function DashboardPage() {
                 <div className="text-center py-8">
                   <FolderKanbanIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <p className="text-muted-foreground">No projects found</p>
+                  {hasPermission(profile, 'create_project') && (
+                    <Link href="/dashboard/projects/new">
+                      <Button variant="outline" className="mt-4">
+                        <PlusIcon className="mr-2 h-4 w-4" />
+                        Create Your First Project
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               )}
             </CardContent>

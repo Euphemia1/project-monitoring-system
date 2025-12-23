@@ -25,6 +25,7 @@ const rolePermissions: Record<UserRole, string[]> = {
     'upload_documents',
     'view_reports',
     'manage_users',
+    'view_all_projects',
     'view_all_districts'
   ],
   project_engineer: [
@@ -35,18 +36,22 @@ const rolePermissions: Record<UserRole, string[]> = {
     'edit_progress',
     'upload_documents',
     'view_reports',
+    'view_all_projects',
     'view_own_district'
   ],
   project_manager: [
     'view_dashboard',
+    'create_project',
     'create_progress',
     'edit_progress',
     'upload_documents',
     'view_reports',
+    'view_all_projects',
     'view_own_district'
   ],
   viewer: [
     'view_dashboard',
+    'view_all_projects',
     'view_reports',
     'view_own_district'
   ]

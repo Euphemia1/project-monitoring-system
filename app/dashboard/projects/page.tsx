@@ -118,10 +118,10 @@ export default function ProjectsPage() {
         throw new Error('Invalid response from server')
       }
 
-      // Filter non-directors to their own created projects (until assignment tables are implemented)
-      if (currentUserRole !== 'director' && currentUserId) {
-        projectsData = projectsData.filter((p: any) => p.creator?.id?.toString?.() === currentUserId.toString())
-      }
+      // // Filter non-directors to their own created projects (until assignment tables are implemented)
+      // if (currentUserRole !== 'director' && currentUserId) {
+      //   projectsData = projectsData.filter((p: any) => p.creator?.id?.toString?.() === currentUserId.toString())
+      // }
 
       setProjects(projectsData)
       setFilteredProjects(projectsData)

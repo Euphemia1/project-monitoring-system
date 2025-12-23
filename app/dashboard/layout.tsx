@@ -86,19 +86,44 @@ export default function DashboardLayout({
               }
             });
 
-            if (!response.ok) {
-              throw new Error('Session validation failed');
+            // Handle authentication errors specifically
+            if (response.status === 401) {
+              handleSignOut();
+              return;
             }
 
-            const data = await response.json();
-            if (!data?.authenticated || !data?.user?.id) {
-              throw new Error('Not authenticated');
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error('Auth API Error:', errorText);
+              throw new Error(`Session validation failed: ${response.status} ${response.statusText}`);
             }
+
+            let data;
+            try {
+              data = await response.json();
+            } catch (jsonError) {
+              const errorText = await response.text();
+              console.error('Invalid JSON from auth API:', errorText);
+              throw new Error('Invalid response from authentication server');
+            }
+
+            if (!data?.authenticated || !data?.user?.id) {
+              handleSignOut();
+              return;
+            }
+
+            // Ensure user object has all required properties
+            const userData = {
+              id: data.user.id,
+              name: data.user.name || data.user.full_name || data.user.email,
+              email: data.user.email,
+              role: data.user.role,
+            };
 
             if (typeof window !== 'undefined') {
-              localStorage.setItem('user', JSON.stringify(data.user));
+              localStorage.setItem('user', JSON.stringify(userData));
             }
-            setUser(data.user);
+            setUser(userData);
           } catch (error) {
             console.error('Auth check failed:', error);
             handleSignOut();

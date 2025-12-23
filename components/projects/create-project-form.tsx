@@ -17,8 +17,8 @@ interface District {
 
 interface CreateProjectFormProps {
   districts: District[]
-  userId: string
 }
+
 
 interface Section {
   id: string
@@ -40,7 +40,7 @@ const DEFAULT_TRADES = [
   "Carpentry",
 ]
 
-export function CreateProjectForm({ districts, userId }: CreateProjectFormProps) {
+export function CreateProjectForm({ districts }: CreateProjectFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -146,7 +146,6 @@ export function CreateProjectForm({ districts, userId }: CreateProjectFormProps)
         completion_date: completionDate,
         contract_sum: calculateContractSum(),
         status: "pending_approval",
-        created_by: userId,
         sections: sections.map(section => ({
           name: section.name,
           house_type: section.houseType,
@@ -157,7 +156,7 @@ export function CreateProjectForm({ districts, userId }: CreateProjectFormProps)
               amount: parseFloat(trade.amount) || 0
             }))
         }))
-      }
+      } 
 
       const response = await fetch('/api/projects', {
         method: 'POST',
@@ -174,10 +173,15 @@ export function CreateProjectForm({ districts, userId }: CreateProjectFormProps)
       }
 
       const project = await response.json()
-      window.alert('Project created successfully')
 
-      router.push(`/dashboard/projects/${project.id}`)
-      router.refresh()
+     
+      window.alert('Project created successfully!')
+
+     
+      router.push('/dashboard/projects')
+router.refresh()
+
+      
     } catch (err) {
       console.error('Error creating project:', err)
       setError(err instanceof Error ? err.message : "Failed to create project")
@@ -186,10 +190,6 @@ export function CreateProjectForm({ districts, userId }: CreateProjectFormProps)
       setIsLoading(false)
     }
   }
-
-  // ... rest of the component remains the same until the return statement
-  // The JSX part of the component can remain exactly the same
-  // since we're only changing the data handling logic
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl">

@@ -40,7 +40,7 @@ export async function authenticateUser(email: string, password: string): Promise
   try {
     // Get user from database
     const users: any[] = await query(
-      'SELECT id, email, full_name, role, district_id, phone, created_at, updated_at, password_hash FROM users WHERE email = ? AND is_active = TRUE',
+      'SELECT id, email, name, role, district_id, phone, created_at, updated_at, password FROM users WHERE email = ? AND is_active = TRUE',
       [email]
     );
 
@@ -51,7 +51,7 @@ export async function authenticateUser(email: string, password: string): Promise
     const user = users[0];
 
     // Verify password
-    const isValidPassword = await verifyPassword(password, user.password_hash);
+    const isValidPassword = await verifyPassword(password, user.password);
     if (!isValidPassword) {
       return null;
     }
@@ -59,8 +59,8 @@ export async function authenticateUser(email: string, password: string): Promise
     // Generate token
     const token = generateToken(user.id);
 
-    // Return user without password hash
-    const { password_hash, ...userWithoutPassword } = user;
+    // Return user without password
+    const { password, ...userWithoutPassword } = user;
     
     return {
       token,
@@ -73,6 +73,7 @@ export async function authenticateUser(email: string, password: string): Promise
 }
 
 // Register a new user
+// Force recompilation
 export async function registerUser(
   email: string,
   password: string,
@@ -93,23 +94,21 @@ export async function registerUser(
 
     // Insert new user
     const result: any = await query(
-      `INSERT INTO users (email, password_hash, full_name, role_id, district_id, phone) 
-       VALUES (?, ?, ?, (SELECT id FROM user_roles WHERE name = ?), ?, ?)`,
+      `INSERT INTO users (email, password, name, role, district_id, phone, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)`,
       [email, hashedPassword, fullName, role, districtId, phone]
     );
 
     const userId = result.insertId;
 
-    // Get the role name from role_id
-    const roles: any[] = await query('SELECT name FROM user_roles WHERE id = (SELECT role_id FROM users WHERE id = ?)', [userId]);
-    const roleName = roles.length > 0 ? roles[0].name : 'viewer';
+    // Use the role directly since it's stored in the users table
+    const roleName = role;
 
     // Create user object
     const user = {
       id: userId.toString(),
       email,
       full_name: fullName,
-      role: roleName as any,
+      role: roleName,
       district_id: districtId,
       phone,
       created_at: new Date().toISOString(),
@@ -133,12 +132,7 @@ export async function registerUser(
 export async function getUserById(userId: string): Promise<Profile | null> {
   try {
     const users: any[] = await query(
-      `SELECT u.id, u.email, u.full_name, ur.name as role, u.district_id, u.phone, u.created_at, u.updated_at,
-              d.id as district_id, d.name as district_name, d.code as district_code
-       FROM users u
-       LEFT JOIN user_roles ur ON u.role_id = ur.id
-       LEFT JOIN districts d ON u.district_id = d.id
-       WHERE u.id = ? AND u.is_active = TRUE`,
+      `SELECT u.id, u.email, u.name, u.role, u.district_id, u.phone, u.created_at, u.updated_at, d.id as district_id, d.name as district_name, d.code as district_code FROM users u LEFT JOIN districts d ON u.district_id = d.id WHERE u.id = ? AND u.is_active = TRUE`,
       [userId]
     );
 
@@ -151,7 +145,7 @@ export async function getUserById(userId: string): Promise<Profile | null> {
     const profile: Profile = {
       id: user.id.toString(),
       email: user.email,
-      full_name: user.full_name,
+      full_name: user.name,
       role: user.role,
       district_id: user.district_id,
       phone: user.phone,

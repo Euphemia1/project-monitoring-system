@@ -70,7 +70,8 @@ export default function NewProjectPage() {
         ) : !userId ? (
           <div className="text-red-500">You must be logged in to create a project.</div>
         ) : (
-          <CreateProjectForm districts={districts} userId={userId} />
+         <CreateProjectForm districts={districts} />
+
         )}
       </div>
     </div>
