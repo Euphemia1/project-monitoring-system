@@ -128,7 +128,8 @@ export async function POST(request: Request) {
     const publicUrl = `/uploads/documents/${projectId}/${storedName}`
 
     const progressReportId = progressReportIdRaw ? Number(progressReportIdRaw) : null
-    const actionAssigneeId = actionAssigneeRaw ? Number(actionAssigneeRaw) : null
+    const parsedAssignee = actionAssigneeRaw ? Number(actionAssigneeRaw) : null
+    const actionAssigneeId = typeof parsedAssignee === "number" && Number.isFinite(parsedAssignee) ? parsedAssignee : null
 
     const result: any = await query(
       `
@@ -167,5 +168,58 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("POST /api/documents error:", error)
     return NextResponse.json({ error: "Failed to upload document" }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const documentId = String(body?.document_id || "").trim()
+    const actionStatus = String(body?.action_status || "").trim()
+    const actionResponse = String(body?.action_response || "").trim()
+
+    if (!documentId || !actionStatus) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    }
+
+    // Verify access through project assignment
+    const accessRows: any[] = await query(
+      `
+      SELECT d.project_id
+      FROM documents d
+      WHERE d.id = ?
+      LIMIT 1
+      `,
+      [documentId],
+    )
+
+    if (!accessRows.length) {
+      return NextResponse.json({ error: "Document not found" }, { status: 404 })
+    }
+
+    const projectId = String(accessRows[0].project_id)
+    const hasAccess = await canAccessProject(user, projectId)
+    if (!hasAccess) {
+      return NextResponse.json({ error: "Not authorized" }, { status: 403 })
+    }
+
+    await query(
+      `
+      UPDATE documents
+      SET action_status = ?, action_response = ?
+      WHERE id = ?
+      `,
+      [actionStatus, actionResponse || null, documentId],
+    )
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("PATCH /api/documents error:", error)
+    return NextResponse.json({ error: "Failed to update document" }, { status: 500 })
   }
 }

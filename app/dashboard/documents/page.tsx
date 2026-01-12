@@ -2,11 +2,12 @@
 
 import { Header } from "@/components/dashboard/header"
 import { query } from "@/lib/db"
+import { getCurrentUser } from "@/lib/user"
 
 interface Document {
   id: string
-  name: string
-  type: string
+  title: string
+  document_type: string
   size: number
   url: string
   project_id: string
@@ -14,35 +15,72 @@ interface Document {
   uploaded_by: string
   uploaded_at: string
   status: 'pending' | 'approved' | 'rejected'
+  uploaded_by_name?: string
 }
 
 export default async function DocumentsPage() {
   try {
+    const user = await getCurrentUser()
+    if (!user) {
+      return (
+        <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+          <Header title="Documents" subtitle="Not authenticated" />
+        </div>
+      )
+    }
+
     // Fetch documents with related data
-    const documents = await query(`
+    const docValues: any[] = []
+    let accessJoin = ""
+    if (user.role !== "director") {
+      accessJoin = " INNER JOIN project_assignments pa ON pa.project_id = d.project_id AND pa.user_id = ? "
+      docValues.push(user.id)
+    }
+
+    const documents = (await query(
+      `
       SELECT 
-        d.*,
+        d.id,
+        d.project_id,
+        d.document_type,
+        d.title,
+        d.url,
+        d.size,
+        d.uploaded_by,
+        d.uploaded_at,
+        d.status,
         p.contract_name as project_name,
         u.name as uploaded_by_name
       FROM documents d
       LEFT JOIN projects p ON d.project_id = p.id
       LEFT JOIN users u ON d.uploaded_by = u.id
+      ${accessJoin}
       ORDER BY d.uploaded_at DESC
-    `) as Document[]
+      `,
+      docValues,
+    )) as Document[]
 
     // Fetch projects for the filter dropdown
-    const projects = await query(`
-      SELECT id, contract_name as name 
-      FROM projects 
-      ORDER BY contract_name
-    `)
+    const projectValues: any[] = []
+    let projectJoin = ""
+    if (user.role !== "director") {
+      projectJoin = " INNER JOIN project_assignments pa ON pa.project_id = p.id AND pa.user_id = ? "
+      projectValues.push(user.id)
+    }
+
+    const projects = (await query(
+      `
+      SELECT p.id, p.contract_name as name
+      FROM projects p
+      ${projectJoin}
+      ORDER BY p.contract_name
+      `,
+      projectValues,
+    )) as any[]
 
     return (
       <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-        <Header
-          title="Documents"
-          description="Manage all project documents"
-        />
+        <Header title="Documents" subtitle="Manage all project documents" />
         <div className="rounded-md border">
           <div className="p-4 border-b">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -107,7 +145,7 @@ export default async function DocumentsPage() {
                         <div className="flex items-center">
                           <div>
                             <div className="text-sm font-medium text-gray-900">
-                              {doc.name}
+                              {doc.title}
                             </div>
                             <div className="text-sm text-gray-500">
                               {(doc.size / 1024).toFixed(1)} KB
@@ -122,7 +160,7 @@ export default async function DocumentsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                          {doc.type}
+                          {doc.document_type}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -180,7 +218,7 @@ export default async function DocumentsPage() {
       <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
         <Header
           title="Documents"
-          description="Error loading documents"
+          subtitle="Error loading documents"
         />
         <div className="text-red-500">Failed to load documents. Please try again later.</div>
       </div>

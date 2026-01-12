@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileText, Plus, Search, Download, Filter, Folder, Calendar, User } from "lucide-react"
 import type { Document, DocumentType, UserRole, ActionStatus } from "@/lib/types"
-import { createClient } from "@/lib/supabase/client"
 
 interface DocumentsViewProps {
   documents: (Document & {
@@ -165,18 +164,22 @@ export function DocumentsView({ documents, projects, userRole }: DocumentsViewPr
   }
 
   const handleUpdateActionStatus = async (documentId: string, status: ActionStatus) => {
-    const supabase = createClient()
-    
-    const { error } = await supabase
-      .from('documents')
-      .update({ action_status: status })
-      .eq('id', documentId)
-    
-    if (error) {
-      console.error('Error updating action status:', error)
-    } else {
-      // Refresh the page to show updated status
+    try {
+      const res = await fetch("/api/documents", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ document_id: documentId, action_status: status }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || "Failed to update action status")
+      }
+
       router.refresh()
+    } catch (e) {
+      console.error("Error updating action status:", e)
     }
   }
 

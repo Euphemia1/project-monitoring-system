@@ -4,7 +4,6 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -105,48 +104,35 @@ export function CreateProgressForm({
     setIsLoading(true)
     setError(null)
 
-    const supabase = createClient()
-
     try {
-      // Create the progress report
-      const { data: report, error: reportError } = await supabase
-        .from("progress_reports")
-        .insert({
-          project_id: selectedProjectId,
-          report_no: nextReportNo,
-          report_date: reportDate,
-          description: description || null,
-          created_by: userId,
-        })
-        .select()
-        .single()
-
-      if (reportError) throw reportError
-
-      // Create trade progress entries
-      const progressEntries = tradeProgress
-        .filter((tp) => tp.progressPercentage > 0)
-        .map((tp) => ({
-          progress_report_id: report.id,
-          trade_id: tp.tradeId,
-          progress_percentage: tp.progressPercentage,
-          amount_completed: tp.amountCompleted,
-        }))
-
-      if (progressEntries.length > 0) {
-        const { error: progressError } = await supabase.from("trade_progress").insert(progressEntries)
-
-        if (progressError) throw progressError
+      const payload = {
+        project_id: selectedProjectId,
+        report_no: nextReportNo,
+        report_date: reportDate,
+        description: description || null,
+        trade_progress: tradeProgress
+          .filter((tp) => tp.progressPercentage > 0)
+          .map((tp) => ({
+            trade_id: tp.tradeId,
+            progress_percentage: tp.progressPercentage,
+            amount_completed: tp.amountCompleted,
+          })),
       }
 
-      // Update project status to in_progress if it was approved
-      await supabase
-        .from("projects")
-        .update({ status: "in_progress" })
-        .eq("id", selectedProjectId)
-        .eq("status", "approved")
+      const res = await fetch("/api/progress-reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      })
 
-      router.push(`/dashboard/progress/${report.id}`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || "Failed to create progress report")
+      }
+
+      const data = await res.json().catch(() => null)
+      router.push(`/dashboard/progress/${data?.id}`)
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create progress report")

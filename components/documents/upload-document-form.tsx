@@ -4,7 +4,6 @@ import type React from "react"
 
 import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -147,37 +146,27 @@ export function UploadDocumentForm({
     setIsLoading(true)
     setError(null)
 
-    const supabase = createClient()
-
     try {
-      // Upload file to Supabase Storage
-      const fileExt = selectedFile.name.split(".").pop()
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-      const filePath = `documents/${projectId}/${fileName}`
+      const formData = new FormData()
+      formData.append("project_id", projectId)
+      formData.append("progress_report_id", reportId || "")
+      formData.append("document_type", documentType)
+      formData.append("title", title)
+      formData.append("description", description)
+      formData.append("action_required", actionRequired)
+      formData.append("action_assignee_id", actionAssigneeId)
+      formData.append("file", selectedFile)
 
-      const { error: uploadError } = await supabase.storage.from("project-documents").upload(filePath, selectedFile)
-
-      if (uploadError) throw uploadError
-
-      // Get public URL
-      const { data: urlData } = supabase.storage.from("project-documents").getPublicUrl(filePath)
-
-      // Create document record
-      const { error: dbError } = await supabase.from("documents").insert({
-        project_id: projectId,
-        progress_report_id: reportId || null,
-        document_type: documentType,
-        title,
-        description: description || null,
-        file_url: urlData.publicUrl,
-        file_name: selectedFile.name,
-        file_size: selectedFile.size,
-        uploaded_by: userId,
-        action_required: actionRequired || null,
-        action_assignee_id: actionAssigneeId || null,
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
       })
 
-      if (dbError) throw dbError
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || "Failed to upload document")
+      }
 
       setSuccess(true)
       setTimeout(() => {
