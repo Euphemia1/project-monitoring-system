@@ -17,6 +17,29 @@ interface District {
 
 interface CreateProjectFormProps {
   districts: District[]
+  initialProjectData?: {
+    id?: string
+    contract_no?: string
+    contract_name?: string
+    description?: string
+    district_id?: string
+    start_date?: string
+    completion_date?: string
+    contract_sum?: number
+    status?: string
+  }
+  initialSectionsData?: {
+    id: string
+    name: string
+    house_type: string
+    trades: {
+      id: string
+      name: string
+      amount: number
+    }[]
+  }[]
+  isEditing?: boolean
+  projectId?: string
 }
 
 
@@ -40,32 +63,45 @@ const DEFAULT_TRADES = [
   "Carpentry",
 ]
 
-export function CreateProjectForm({ districts }: CreateProjectFormProps) {
+export function CreateProjectForm({ districts, initialProjectData, initialSectionsData, isEditing = false, projectId }: CreateProjectFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Project Details
-  const [contractNo, setContractNo] = useState("")
-  const [contractName, setContractName] = useState("")
-  const [districtId, setDistrictId] = useState("")
-  const [startDate, setStartDate] = useState("")
-  const [completionDate, setCompletionDate] = useState("")
-  const [description, setDescription] = useState("")
+  const [contractNo, setContractNo] = useState(initialProjectData?.contract_no || "")
+  const [contractName, setContractName] = useState(initialProjectData?.contract_name || "")
+  const [districtId, setDistrictId] = useState(initialProjectData?.district_id || "")
+  const [startDate, setStartDate] = useState(initialProjectData?.start_date || "")
+  const [completionDate, setCompletionDate] = useState(initialProjectData?.completion_date || "")
+  const [description, setDescription] = useState(initialProjectData?.description || "")
 
   // Sections with Trades
-  const [sections, setSections] = useState<Section[]>([
-    {
-      id: crypto.randomUUID(),
-      name: "Section 1",
-      houseType: "Houses Type A",
-      trades: [
-        { id: crypto.randomUUID(), name: "Substructure", amount: "" },
-        { id: crypto.randomUUID(), name: "Concrete", amount: "" },
-        { id: crypto.randomUUID(), name: "Blockwork", amount: "" },
-      ],
-    },
-  ])
+  const [sections, setSections] = useState<Section[]>(
+    initialSectionsData && initialSectionsData.length > 0
+      ? initialSectionsData.map(section => ({
+          id: section.id,
+          name: section.name,
+          houseType: section.house_type,
+          trades: section.trades.map(trade => ({
+            id: trade.id,
+            name: trade.name,
+            amount: trade.amount.toString(),
+          })),
+        }))
+      : [
+          {
+            id: crypto.randomUUID(),
+            name: "Section 1",
+            houseType: "Houses Type A",
+            trades: [
+              { id: crypto.randomUUID(), name: "Substructure", amount: "" },
+              { id: crypto.randomUUID(), name: "Concrete", amount: "" },
+              { id: crypto.randomUUID(), name: "Blockwork", amount: "" },
+            ],
+          },
+        ]
+  )
 
   const addSection = () => {
     setSections([
@@ -136,56 +172,98 @@ export function CreateProjectForm({ districts }: CreateProjectFormProps) {
     setError(null)
 
     try {
-      // Create the project
-      const projectData = {
-        contract_no: contractNo,
-        contract_name: contractName,
-        description,
-        district_id: districtId,
-        start_date: startDate,
-        completion_date: completionDate,
-        contract_sum: calculateContractSum(),
-        status: "pending_approval",
-        sections: sections.map(section => ({
-          name: section.name,
-          house_type: section.houseType,
-          trades: section.trades
-            .filter(t => t.name && t.amount)
-            .map(trade => ({
-              name: trade.name,
-              amount: parseFloat(trade.amount) || 0
-            }))
-        }))
-      } 
+      if (isEditing && projectId) {
+        // Update the project
+        const projectData = {
+          contract_no: contractNo,
+          contract_name: contractName,
+          description,
+          district_id: districtId,
+          start_date: startDate,
+          completion_date: completionDate,
+          contract_sum: calculateContractSum(),
+          sections: sections.map(section => ({
+            // Only include ID if it's a numeric database ID (not a UUID)
+            ...(Number.isInteger(Number(section.id)) ? { id: section.id } : {}),
+            name: section.name,
+            house_type: section.houseType,
+            trades: section.trades
+              .filter(t => t.name && t.amount)
+              .map(trade => ({
+                // Only include ID if it's a numeric database ID (not a UUID)
+                ...(Number.isInteger(Number(trade.id)) ? { id: trade.id } : {}),
+                name: trade.name,
+                amount: parseFloat(trade.amount) || 0
+              }))
+          }))
+        } 
+        
+        console.log('Sending PUT request with data:', projectData);
+        console.log('Project ID:', projectId);
 
-      const response = await fetch('/api/projects', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(projectData),
-        credentials: 'include'
-      })
+        const response = await fetch(`/api/projects?id=${encodeURIComponent(projectId)}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(projectData),
+          credentials: 'include'
+        })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to create project')
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to update project')
+        }
+
+        window.alert('Project updated successfully!')
+        router.push(`/dashboard/projects/${projectId}`)
+      } else {
+        // Create the project
+        const projectData = {
+          contract_no: contractNo,
+          contract_name: contractName,
+          description,
+          district_id: districtId,
+          start_date: startDate,
+          completion_date: completionDate,
+          contract_sum: calculateContractSum(),
+          status: "pending_approval",
+          sections: sections.map(section => ({
+            name: section.name,
+            house_type: section.houseType,
+            trades: section.trades
+              .filter(t => t.name && t.amount)
+              .map(trade => ({
+                name: trade.name,
+                amount: parseFloat(trade.amount) || 0
+              }))
+          }))
+        } 
+
+        const response = await fetch('/api/projects', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(projectData),
+          credentials: 'include'
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to create project')
+        }
+
+        const project = await response.json()
+
+        window.alert('Project created successfully!')
+        router.push('/dashboard/projects')
+        router.refresh()
       }
-
-      const project = await response.json()
-
-     
-      window.alert('Project created successfully!')
-
-     
-      router.push('/dashboard/projects')
-router.refresh()
-
-      
     } catch (err) {
-      console.error('Error creating project:', err)
-      setError(err instanceof Error ? err.message : "Failed to create project")
-      window.alert('Failed to create project. Please try again.')
+      console.error('Error processing project:', err)
+      setError(err instanceof Error ? err.message : "Failed to process project")
+      window.alert('Failed to process project. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -332,7 +410,7 @@ router.refresh()
                   <thead>
                     <tr className="border-b border-border bg-muted/50">
                       <th className="px-4 py-2 text-left text-sm font-medium text-foreground">Trade</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium text-foreground">Amount (GHS)</th>
+                      <th className="px-4 py-2 text-right text-sm font-medium text-foreground">Amount (ZMW)</th>
                       <th className="px-4 py-2 w-12"></th>
                     </tr>
                   </thead>
@@ -387,9 +465,9 @@ router.refresh()
                     <tr className="bg-muted/50">
                       <td className="px-4 py-2 font-medium text-foreground">Section Total</td>
                       <td className="px-4 py-2 text-right font-mono font-semibold text-foreground">
-                        {new Intl.NumberFormat("en-GH", {
+                        {new Intl.NumberFormat("en-ZM", {
                           style: "currency",
-                          currency: "GHS",
+                          currency: "ZMW",
                         }).format(section.trades.reduce((sum, t) => sum + (Number.parseFloat(t.amount) || 0), 0))}
                       </td>
                       <td></td>
@@ -415,9 +493,9 @@ router.refresh()
             <div className="flex items-center justify-between">
               <span className="text-lg font-semibold text-foreground">Total Contract Sum</span>
               <span className="text-2xl font-bold text-[#E87A1E] font-mono">
-                {new Intl.NumberFormat("en-GH", {
+                {new Intl.NumberFormat("en-ZM", {
                   style: "currency",
-                  currency: "GHS",
+                  currency: "ZMW",
                 }).format(calculateContractSum())}
               </span>
             </div>
@@ -441,10 +519,10 @@ router.refresh()
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Creating Project...
+              {isEditing ? 'Updating Project...' : 'Creating Project...'}
             </>
           ) : (
-            "Create Project"
+            isEditing ? 'Update Project' : 'Create Project'
           )}
         </Button>
       </div>

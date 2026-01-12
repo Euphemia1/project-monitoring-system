@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
 import { Header } from "@/components/dashboard/header"
 import { UploadDocumentForm } from "@/components/documents/upload-document-form"
+import { getCurrentUser } from "@/lib/user"
+import { query } from "@/lib/db"
 
 interface PageProps {
   searchParams: Promise<{ project?: string; report?: string }>
@@ -9,34 +10,50 @@ interface PageProps {
 
 export default async function UploadDocumentPage({ searchParams }: PageProps) {
   const { project: projectId, report: reportId } = await searchParams
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user?.id).single()
+  const user = await getCurrentUser()
+  if (!user) {
+    redirect("/auth/login")
+  }
 
   // Only authorized users can upload
-  if (!["project_manager", "director", "project_engineer"].includes(profile?.role || "")) {
+  if (!["project_manager", "director", "project_engineer"].includes(user.role || "")) {
     redirect("/dashboard/documents")
   }
 
-  // Fetch projects
-  const { data: projects } = await supabase
-    .from("projects")
-    .select("id, contract_no, contract_name, district:districts(name)")
-    .order("contract_name")
+  const projectValues: any[] = []
+  let projectsSql = `
+    SELECT p.id, p.contract_no, p.contract_name, d.name AS district_name
+    FROM projects p
+    LEFT JOIN districts d ON d.id = p.district_id
+  `
+
+  if (user.role !== "director") {
+    projectsSql += ` INNER JOIN project_assignments pa ON pa.project_id = p.id AND pa.user_id = ? `
+    projectValues.push(user.id)
+  }
+
+  projectsSql += ` ORDER BY p.contract_name `
+
+  const projectsRows: any[] = await query(projectsSql, projectValues)
+  const projects = projectsRows.map((p) => ({
+    id: String(p.id),
+    contract_no: p.contract_no,
+    contract_name: p.contract_name,
+    district: p.district_name ? { name: p.district_name } : null,
+  }))
 
   // Fetch progress reports if project is selected
-  let progressReports = null
+  let progressReports: any[] = []
   if (projectId) {
-    const { data } = await supabase
-      .from("progress_reports")
-      .select("id, report_no, report_date")
-      .eq("project_id", projectId)
-      .order("report_no", { ascending: false })
-    progressReports = data
+    progressReports = (await query(
+      `
+      SELECT id, report_no, report_date
+      FROM progress_reports
+      WHERE project_id = ?
+      ORDER BY report_no DESC
+      `,
+      [projectId],
+    )) as any[]
   }
 
   return (
@@ -48,7 +65,7 @@ export default async function UploadDocumentPage({ searchParams }: PageProps) {
           progressReports={progressReports || []}
           selectedProjectId={projectId || ""}
           selectedReportId={reportId || ""}
-          userId={user?.id || ""}
+          userId={user.id?.toString?.() || ""}
         />
       </div>
     </div>

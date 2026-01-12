@@ -88,18 +88,74 @@ CREATE TABLE trade_progress (
 
 -- Document types enum
 CREATE TYPE document_type AS ENUM (
+  -- Precontract documents
+  'precontract_document',
+  
+  -- Contract documents
+  'contract_record_details',
   'contract_documentation',
+  'contract_document',
+  'contract_documents',
   'bills_of_quantities',
   'drawings',
   'internal_approvals',
+  
+  -- Correspondence
+  'incoming_correspondence',
+  'incoming_correspondence_main',
+  'outgoing_correspondence',
+  'outgoing_correspondence_main',
+  'internal_correspondence',
+  'internal_memos',
+  
+  -- Interim Payment files
+  'interim_payment_certificate',
+  'remeasurements',
+  'remeasurements_main',
+  'interim_valuations_certificate',
+  'interim_valuations_certificate_main',
+  
+  -- Site Meetings
   'site_instruction',
   'site_inspection_report',
   'site_meeting_minutes',
-  'incoming_correspondence',
-  'outgoing_correspondence',
-  'interim_payment_certificate',
-  'internal_correspondence',
-  'progress_report_attachment'
+  'site_meeting_minutes_main',
+  'contractors_reports',
+  'contractors_reports_main',
+  
+  -- Variation Account
+  'variation_measurement',
+  'measurement_of_variations',
+  
+  -- Final Account Records
+  'final_account_remeasurement',
+  'remeasurement_main',
+  
+  -- Contract Administration
+  'delays_disruptions_records',
+  
+  -- Reports
+  'progress_report_attachment',
+  'all_reports',
+  
+  -- System documentation
+  'how_to_use_filling_system',
+  
+  -- Other
+  'other_report'
+)
+);
+
+-- Action required enum
+CREATE TYPE action_status AS ENUM ('pending', 'in_progress', 'completed');
+
+-- Action assignee table for tracking who is responsible for actions
+CREATE TABLE action_assignees (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(255) NOT NULL,
+  email VARCHAR(255),
+  role VARCHAR(100),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Documents table
@@ -109,10 +165,15 @@ CREATE TABLE documents (
   progress_report_id UUID REFERENCES progress_reports(id) ON DELETE CASCADE,
   document_type document_type NOT NULL,
   title VARCHAR(255) NOT NULL,
+  description TEXT,
   file_url TEXT NOT NULL,
   file_name VARCHAR(255) NOT NULL,
   file_size INTEGER,
   uploaded_by UUID NOT NULL REFERENCES profiles(id),
+  action_required TEXT,  -- Action needed for this document
+  action_assignee_id UUID REFERENCES action_assignees(id),  -- Person assigned to take action
+  action_status action_status DEFAULT 'pending',  -- Status of the action
+  action_response TEXT,  -- Response to the action
   is_locked BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

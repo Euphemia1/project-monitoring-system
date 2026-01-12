@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -9,7 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileText, Plus, Search, Download, Filter, Folder, Calendar, User } from "lucide-react"
-import type { Document, DocumentType, UserRole } from "@/lib/types"
+import type { Document, DocumentType, UserRole, ActionStatus } from "@/lib/types"
+import { createClient } from "@/lib/supabase/client"
 
 interface DocumentsViewProps {
   documents: (Document & {
@@ -22,42 +24,103 @@ interface DocumentsViewProps {
 }
 
 const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  precontract_document: "Precontract Document",
+  contract_record_details: "Contract Record Details",
   contract_documentation: "Contract Documentation",
+  contract_document: "Contract Document",
+  contract_documents: "Contract Documents",
   bills_of_quantities: "Bills of Quantities",
   drawings: "Drawings",
   internal_approvals: "Internal Approvals",
   site_instruction: "Site Instructions",
   site_inspection_report: "Site Inspection Reports",
   site_meeting_minutes: "Site Meeting Minutes",
+  site_meeting_minutes_main: "Site Meeting Minutes (Main)",
+  contractors_reports: "Contractor's Reports",
+  contractors_reports_main: "Contractor's Reports (Main)",
   incoming_correspondence: "Incoming Correspondence",
+  incoming_correspondence_main: "Incoming Correspondence (Main)",
   outgoing_correspondence: "Outgoing Correspondence",
-  interim_payment_certificate: "Interim Payment Certificates",
+  outgoing_correspondence_main: "Outgoing Correspondence (Main)",
   internal_correspondence: "Internal Correspondence",
+  internal_memos: "Internal Memos",
+  interim_payment_certificate: "Interim Payment Certificates",
+  remeasurements: "Remeasurements",
+  remeasurements_main: "Remeasurements (Main)",
+  interim_valuations_certificate: "Interim Valuations & Certificate",
+  interim_valuations_certificate_main: "Interim Valuations & Certificate (Main)",
+  variation_measurement: "Variation Measurement",
+  measurement_of_variations: "Measurement of Variations",
+  final_account_remeasurement: "Final Account Remeasurement",
+  remeasurement_main: "Remeasurement (Main)",
+  delays_disruptions_records: "Delays & Disruptions Records",
   progress_report_attachment: "Progress Report Attachments",
+  all_reports: "All Type of Reports",
+  how_to_use_filling_system: "How to use the Filling System",
+  other_report: "Other Report",
 }
 
 const DOCUMENT_CATEGORIES = [
   { key: "all", label: "All Documents" },
   {
-    key: "contract",
-    label: "Contract Docs",
-    types: ["contract_documentation", "bills_of_quantities", "drawings", "internal_approvals"],
+    key: "precontract",
+    label: "Precontract",
+    types: ["precontract_document"],
   },
   {
-    key: "site",
-    label: "Site Documents",
-    types: ["site_instruction", "site_inspection_report", "site_meeting_minutes"],
+    key: "contract",
+    label: "Contract Docs",
+    types: ["contract_record_details", "contract_documentation", "contract_document", "contract_documents", "bills_of_quantities", "drawings", "internal_approvals"],
   },
   {
     key: "correspondence",
     label: "Correspondence",
-    types: ["incoming_correspondence", "outgoing_correspondence", "internal_correspondence"],
+    types: ["incoming_correspondence", "incoming_correspondence_main", "outgoing_correspondence", "outgoing_correspondence_main", "internal_correspondence", "internal_memos"],
   },
-  { key: "payments", label: "Payments", types: ["interim_payment_certificate"] },
-  { key: "progress", label: "Progress Reports", types: ["progress_report_attachment"] },
+  {
+    key: "interim-payment",
+    label: "Interim Payment",
+    types: ["interim_payment_certificate", "remeasurements", "remeasurements_main", "interim_valuations_certificate", "interim_valuations_certificate_main"],
+  },
+  {
+    key: "site",
+    label: "Site Documents",
+    types: ["site_instruction", "site_inspection_report", "site_meeting_minutes", "site_meeting_minutes_main", "contractors_reports", "contractors_reports_main"],
+  },
+  {
+    key: "variation",
+    label: "Variation Account",
+    types: ["variation_measurement", "measurement_of_variations"],
+  },
+  {
+    key: "final-account",
+    label: "Final Account",
+    types: ["final_account_remeasurement", "remeasurement_main"],
+  },
+  {
+    key: "contract-admin",
+    label: "Contract Administration",
+    types: ["delays_disruptions_records"],
+  },
+  {
+    key: "reports",
+    label: "Reports",
+    types: ["progress_report_attachment", "all_reports"],
+  },
+  {
+    key: "system-docs",
+    label: "System Documentation",
+    types: ["how_to_use_filling_system"],
+  },
+  {
+    key: "other",
+    label: "Other",
+    types: ["other_report"],
+  },
 ]
 
 export function DocumentsView({ documents, projects, userRole }: DocumentsViewProps) {
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedProject, setSelectedProject] = useState<string>("all")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
@@ -99,6 +162,22 @@ export function DocumentsView({ documents, projects, userRole }: DocumentsViewPr
       month: "short",
       year: "numeric",
     })
+  }
+
+  const handleUpdateActionStatus = async (documentId: string, status: ActionStatus) => {
+    const supabase = createClient()
+    
+    const { error } = await supabase
+      .from('documents')
+      .update({ action_status: status })
+      .eq('id', documentId)
+    
+    if (error) {
+      console.error('Error updating action status:', error)
+    } else {
+      // Refresh the page to show updated status
+      router.refresh()
+    }
   }
 
   const getDocTypeIcon = (type: DocumentType) => {
@@ -218,6 +297,34 @@ export function DocumentsView({ documents, projects, userRole }: DocumentsViewPr
                                   <Calendar className="h-3 w-3" />
                                   {formatDate(doc.created_at)}
                                 </span>
+                                {doc.action_required && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-orange-600">
+                                      Action: {doc.action_required}
+                                    </span>
+                                  </>
+                                )}
+                                {doc.action_assignee_id && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-blue-600">
+                                      Assignee: {doc.action_assignee_id}
+                                    </span>
+                                  </>
+                                )}
+                                {doc.action_status && (
+                                  <>
+                                    <span>•</span>
+                                    <span className={`
+                                      ${doc.action_status === 'completed' ? 'text-green-600' : 
+                                        doc.action_status === 'in_progress' ? 'text-yellow-600' : 
+                                        'text-red-600'}
+                                    `}>
+                                      Status: {doc.action_status}
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -227,11 +334,23 @@ export function DocumentsView({ documents, projects, userRole }: DocumentsViewPr
                                 Locked
                               </Badge>
                             )}
-                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                              <Button variant="ghost" size="sm">
-                                <Download className="h-4 w-4" />
-                              </Button>
-                            </a>
+                            <div className="flex items-center gap-2">
+                              {doc.action_required && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleUpdateActionStatus(doc.id, 'completed')}
+                                  className="text-xs"
+                                >
+                                  Mark Complete
+                                </Button>
+                              )}
+                              <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                                <Button variant="ghost" size="sm">
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              </a>
+                            </div>
                           </div>
                         </div>
                       ))}

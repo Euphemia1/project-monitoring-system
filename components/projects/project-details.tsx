@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +22,7 @@ import {
   Download,
   Loader2,
   AlertTriangle,
+  Pencil,
 } from "lucide-react"
 import Link from "next/link"
 import type { Project, ProjectSection, ProgressReport, Document, Trade, UserRole } from "@/lib/types"
@@ -49,21 +50,40 @@ export function ProjectDetails({
 }: ProjectDetailsProps) {
   const router = useRouter()
   const [isApproving, setIsApproving] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+
+  // Close export menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const canApprove = userRole === "director" && project.status === "pending_approval"
+  const canChangeStatus = userRole === "director"
+  const canEditProject = userRole === "director" || 
+                        (userRole === "project_engineer" && project.status === "pending_approval")
   const canAddProgress =
     (userRole === "project_manager" || userRole === "director" || userRole === "project_engineer") &&
     project.status !== "pending_approval"
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-GH", {
+    return new Intl.NumberFormat("en-ZM", {
       style: "currency",
-      currency: "GHS",
+      currency: "ZMW",
     }).format(amount)
   }
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-GH", {
+    return new Date(date).toLocaleDateString("en-ZM", {
       day: "numeric",
       month: "long",
       year: "numeric",
@@ -108,6 +128,33 @@ export function ProjectDetails({
     }
   }
 
+  const handleStatusChange = async (newStatus: string) => {
+    if (newStatus === project.status) return;
+    
+    const ok = window.confirm(`Change project status to ${newStatus.replace('_', ' ')}?`);
+    if (!ok) return;
+    
+    try {
+      const res = await fetch(`/api/projects?id=${encodeURIComponent(project.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to update project status');
+      }
+
+      // Update the page without full refresh to show real-time changes
+      window.location.reload();
+    } catch (error) {
+      console.error("Failed to update project status:", error);
+      window.alert(error instanceof Error ? error.message : 'Failed to update project status');
+    }
+  }
+
   const calculateTotalProgress = () => {
     // This would calculate based on all trade progress across all reports
     // For now, return a placeholder
@@ -128,7 +175,11 @@ export function ProjectDetails({
   )
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print-container">
+      <div className="print-logo no-print">
+        <h1 className="text-2xl font-bold text-center text-[#E87A1E]">Project Monitoring System</h1>
+        <p className="text-center text-gray-600">Project Report</p>
+      </div>
       {/* Project Overview Card */}
       <Card className="border-border">
         <CardContent className="p-6">
@@ -189,6 +240,19 @@ export function ProjectDetails({
               </div>
 
               <div className="flex gap-2">
+                {canChangeStatus && (
+                  <select
+                    value={project.status}
+                    onChange={(e) => handleStatusChange(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#E87A1E]"
+                  >
+                    <option value="pending_approval">Pending Approval</option>
+                    <option value="approved">Approved</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="on_hold">On Hold</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                )}
                 {canApprove && (
                   <Button
                     onClick={handleApprove}
@@ -208,6 +272,13 @@ export function ProjectDetails({
                     )}
                   </Button>
                 )}
+                {canEditProject && (
+                  <Link href={`/dashboard/projects/${project.id}/edit`}>
+                    <Button variant="outline" className="border-[#E87A1E] text-[#E87A1E] hover:bg-[#E87A1E]/10">
+                      <Pencil className="mr-2 h-4 w-4" /> Edit Project
+                    </Button>
+                  </Link>
+                )}
                 {canAddProgress && (
                   <Link href={`/dashboard/progress/new?project=${project.id}`}>
                     <Button className="bg-[#E87A1E] text-white hover:bg-[#D16A0E]">
@@ -215,6 +286,52 @@ export function ProjectDetails({
                     </Button>
                   </Link>
                 )}
+                <div className="relative" ref={exportMenuRef}>
+                  <Button 
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    className="bg-gray-600 text-white hover:bg-gray-700"
+                  >
+                    <Download className="mr-2 h-4 w-4" /> Export
+                  </Button>
+                  {showExportMenu && (
+                    <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
+                      <div className="py-1" role="menu">
+                        <button
+                          onClick={() => {
+                            window.print();
+                            setShowExportMenu(false);
+                          }}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                          role="menuitem"
+                        >
+                          Print
+                        </button>
+                        <button
+                          onClick={() => {
+                            // Create PDF functionality would go here
+                            alert('PDF export coming soon!');
+                            setShowExportMenu(false);
+                          }}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                          role="menuitem"
+                        >
+                          Export as PDF
+                        </button>
+                        <button
+                          onClick={() => {
+                            // Create Excel functionality would go here
+                            alert('Excel export coming soon!');
+                            setShowExportMenu(false);
+                          }}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                          role="menuitem"
+                        >
+                          Export as Excel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

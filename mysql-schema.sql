@@ -24,15 +24,14 @@ CREATE TABLE user_roles (
 CREATE TABLE users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   email VARCHAR(255) NOT NULL UNIQUE,
-  password_hash VARCHAR(255) NOT NULL,
-  full_name VARCHAR(255) NOT NULL,
-  role_id INT NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  role VARCHAR(50) NOT NULL DEFAULT 'viewer',
   district_id INT,
   phone VARCHAR(20),
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (role_id) REFERENCES user_roles(id),
   FOREIGN KEY (district_id) REFERENCES districts(id)
 );
 
@@ -104,6 +103,19 @@ CREATE TABLE trade_progress (
   FOREIGN KEY (trade_id) REFERENCES trades(id)
 );
 
+-- Project assignments (many-to-many)
+CREATE TABLE project_assignments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  project_id INT NOT NULL,
+  user_id INT NOT NULL,
+  assigned_by INT NOT NULL,
+  assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_project_user (project_id, user_id),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (assigned_by) REFERENCES users(id)
+);
+
 -- Document types table
 CREATE TABLE document_types (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -116,18 +128,24 @@ CREATE TABLE documents (
   id INT AUTO_INCREMENT PRIMARY KEY,
   project_id INT NOT NULL,
   progress_report_id INT,
-  document_type_id INT NOT NULL,
+  document_type VARCHAR(100) NOT NULL,
   title VARCHAR(255) NOT NULL,
-  file_path TEXT NOT NULL,
+  description TEXT,
+  url TEXT NOT NULL,
   file_name VARCHAR(255) NOT NULL,
-  file_size INT,
+  size INT,
   uploaded_by INT NOT NULL,
+  uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  status VARCHAR(20) DEFAULT 'pending',
+  action_required TEXT,
+  action_assignee_id INT,
+  action_status VARCHAR(20) DEFAULT 'pending',
+  action_response TEXT,
   is_locked BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   FOREIGN KEY (progress_report_id) REFERENCES progress_reports(id) ON DELETE CASCADE,
-  FOREIGN KEY (document_type_id) REFERENCES document_types(id),
-  FOREIGN KEY (uploaded_by) REFERENCES users(id)
+  FOREIGN KEY (uploaded_by) REFERENCES users(id),
+  FOREIGN KEY (action_assignee_id) REFERENCES users(id)
 );
 
 -- Indexes for better performance
@@ -136,8 +154,8 @@ CREATE INDEX idx_projects_status ON projects(status);
 CREATE INDEX idx_projects_created_by ON projects(created_by);
 CREATE INDEX idx_progress_reports_project ON progress_reports(project_id);
 CREATE INDEX idx_documents_project ON documents(project_id);
-CREATE INDEX idx_documents_type ON documents(document_type_id);
-CREATE INDEX idx_users_role ON users(role_id);
+CREATE INDEX idx_documents_type ON documents(document_type);
+CREATE INDEX idx_users_role ON users(role);
 
 -- Insert default roles
 INSERT INTO user_roles (name, description) VALUES

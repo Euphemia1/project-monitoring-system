@@ -4,7 +4,6 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -36,19 +35,22 @@ export function SettingsForm({ profile, districts, userEmail }: SettingsFormProp
     setError(null)
     setSuccess(false)
 
-    const supabase = createClient()
-
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
           full_name: fullName,
           phone: phone || null,
           district_id: districtId || null,
         })
-        .eq("id", profile.id)
+      })
 
-      if (error) throw error
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to update profile')
+      }
 
       setSuccess(true)
       router.refresh()

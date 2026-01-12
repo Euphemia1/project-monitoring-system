@@ -28,8 +28,9 @@ export function ProjectsTable({ projects, districts, userRole, onProjectUpdated 
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
 
   const canCreateProject = userRole === "director" || userRole === "project_engineer"
-  const canEditProject = userRole === "director" || userRole === "project_engineer"
+  const canEditProject = userRole === "director" || userRole === "project_engineer" || userRole === "project_manager"
   const canDeleteProject = userRole === "director"
+  const canChangeStatus = userRole === "director"
 
   const handleDelete = async (projectId: string) => {
     const ok = window.confirm('Delete this project? This cannot be undone.')
@@ -56,6 +57,32 @@ export function ProjectsTable({ projects, districts, userRole, onProjectUpdated 
     }
   }
 
+  const handleStatusChange = async (projectId: string, newStatus: string) => {
+    if (!projectId || !newStatus) return;
+    
+    const ok = window.confirm(`Change project status to ${newStatus.replace('_', ' ')}?`);
+    if (!ok) return;
+    
+    try {
+      const res = await fetch(`/api/projects?id=${encodeURIComponent(projectId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to update project status');
+      }
+
+      onProjectUpdated?.();
+    } catch (error) {
+      console.error("Failed to update project status:", error);
+      alert(error instanceof Error ? error.message : 'Failed to update project status');
+    }
+  }
+
   const filteredProjects = projects.filter((project) => {
     const matchesSearch =
       project.contract_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -77,15 +104,15 @@ export function ProjectsTable({ projects, districts, userRole, onProjectUpdated 
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-GH", {
+    return new Intl.NumberFormat("en-ZM", {
       style: "currency",
-      currency: "GHS",
+      currency: "ZMW",
       minimumFractionDigits: 2,
     }).format(amount)
   }
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-GH", {
+    return new Date(date).toLocaleDateString("en-ZM", {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -188,9 +215,26 @@ export function ProjectsTable({ projects, districts, userRole, onProjectUpdated 
                         </Link>
 
                         {canEditProject && (
-                          <Button variant="ghost" size="sm" disabled title="Edit coming soon">
-                            <Pencil className="h-4 w-4 mr-1" /> Edit
-                          </Button>
+                          <Link href={`/dashboard/projects/${project.id}/edit`}>
+                            <Button variant="ghost" size="sm">
+                              <Pencil className="h-4 w-4 mr-1" /> Edit
+                            </Button>
+                          </Link>
+                        )}
+
+                        {canChangeStatus && (
+                          <select
+                            value={project.status}
+                            onChange={(e) => handleStatusChange(project.id, e.target.value)}
+                            className="text-xs px-2 py-1 border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#E87A1E]"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <option value="pending_approval">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="on_hold">On Hold</option>
+                            <option value="completed">Completed</option>
+                          </select>
                         )}
 
                         {canDeleteProject && (

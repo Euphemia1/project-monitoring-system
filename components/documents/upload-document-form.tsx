@@ -22,18 +22,61 @@ interface UploadDocumentFormProps {
 }
 
 const DOCUMENT_TYPES: { value: DocumentType; label: string; category: string }[] = [
+  // Precontract documents
+  { value: "precontract_document", label: "Precontract Document", category: "Precontract" },
+  
+  // Contract documents
+  { value: "contract_record_details", label: "Contract Record Details", category: "Contract" },
   { value: "contract_documentation", label: "Contract Documentation", category: "Contract" },
+  { value: "contract_document", label: "Contract Document", category: "Contract" },
+  { value: "contract_documents", label: "Contract Documents", category: "Contract" },
   { value: "bills_of_quantities", label: "Bills of Quantities", category: "Contract" },
   { value: "drawings", label: "Drawings", category: "Contract" },
   { value: "internal_approvals", label: "Internal Approvals", category: "Contract" },
+  
+  // Site documents
   { value: "site_instruction", label: "Site Instruction", category: "Site" },
   { value: "site_inspection_report", label: "Site Inspection Report", category: "Site" },
   { value: "site_meeting_minutes", label: "Site Meeting Minutes", category: "Site" },
+  { value: "site_meeting_minutes_main", label: "Site Meeting Minutes (Main)", category: "Site" },
+  { value: "contractors_reports", label: "Contractor's Reports", category: "Site" },
+  { value: "contractors_reports_main", label: "Contractor's Reports (Main)", category: "Site" },
+  
+  // Correspondence
   { value: "incoming_correspondence", label: "Incoming Correspondence", category: "Correspondence" },
+  { value: "incoming_correspondence_main", label: "Incoming Correspondence (Main)", category: "Correspondence" },
   { value: "outgoing_correspondence", label: "Outgoing Correspondence", category: "Correspondence" },
-  { value: "interim_payment_certificate", label: "Interim Payment Certificate", category: "Payments" },
+  { value: "outgoing_correspondence_main", label: "Outgoing Correspondence (Main)", category: "Correspondence" },
   { value: "internal_correspondence", label: "Internal Correspondence", category: "Correspondence" },
-  { value: "progress_report_attachment", label: "Progress Report Attachment", category: "Progress" },
+  { value: "internal_memos", label: "Internal Memos", category: "Correspondence" },
+  
+  // Interim Payment files
+  { value: "interim_payment_certificate", label: "Interim Payment Certificate", category: "Interim Payment" },
+  { value: "remeasurements", label: "Remeasurements", category: "Interim Payment" },
+  { value: "remeasurements_main", label: "Remeasurements (Main)", category: "Interim Payment" },
+  { value: "interim_valuations_certificate", label: "Interim Valuations & Certificate", category: "Interim Payment" },
+  { value: "interim_valuations_certificate_main", label: "Interim Valuations & Certificate (Main)", category: "Interim Payment" },
+  
+  // Variation Account
+  { value: "variation_measurement", label: "Variation Measurement", category: "Variation" },
+  { value: "measurement_of_variations", label: "Measurement of Variations", category: "Variation" },
+  
+  // Final Account Records
+  { value: "final_account_remeasurement", label: "Final Account Remeasurement", category: "Final Account" },
+  { value: "remeasurement_main", label: "Remeasurement (Main)", category: "Final Account" },
+  
+  // Contract Administration
+  { value: "delays_disruptions_records", label: "Delays & Disruptions Records", category: "Contract Administration" },
+  
+  // Reports
+  { value: "progress_report_attachment", label: "Progress Report Attachment", category: "Reports" },
+  { value: "all_reports", label: "All Type of Reports", category: "Reports" },
+  
+  // System documentation
+  { value: "how_to_use_filling_system", label: "How to use the Filling System", category: "System Documentation" },
+  
+  // Other
+  { value: "other_report", label: "Other Report", category: "Other" },
 ]
 
 export function UploadDocumentForm({
@@ -53,6 +96,9 @@ export function UploadDocumentForm({
   const [reportId, setReportId] = useState(selectedReportId)
   const [documentType, setDocumentType] = useState<DocumentType>("contract_documentation") // Updated default value
   const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
+  const [actionRequired, setActionRequired] = useState("")
+  const [actionAssigneeId, setActionAssigneeId] = useState("")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -122,10 +168,13 @@ export function UploadDocumentForm({
         progress_report_id: reportId || null,
         document_type: documentType,
         title,
+        description: description || null,
         file_url: urlData.publicUrl,
         file_name: selectedFile.name,
         file_size: selectedFile.size,
         uploaded_by: userId,
+        action_required: actionRequired || null,
+        action_assignee_id: actionAssigneeId || null,
       })
 
       if (dbError) throw dbError
@@ -240,6 +289,36 @@ export function UploadDocumentForm({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter document title"
               required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Input
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Enter document description"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="actionRequired">Action Required</Label>
+            <Input
+              id="actionRequired"
+              value={actionRequired}
+              onChange={(e) => setActionRequired(e.target.value)}
+              placeholder="Describe action required for this document"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="actionAssigneeId">Assign To</Label>
+            <Input
+              id="actionAssigneeId"
+              value={actionAssigneeId}
+              onChange={(e) => setActionAssigneeId(e.target.value)}
+              placeholder="Enter assignee name or email"
             />
           </div>
         </CardContent>

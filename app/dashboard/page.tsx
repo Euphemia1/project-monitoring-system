@@ -21,21 +21,25 @@ import {
 } from "@/components/icons"
 import { hasPermission } from "@/lib/rbac"
 
-// Helper function to safely execute queries
-async function safeQuery(sql: string, params: any[] = []) {
+// Helper function to fetch dashboard data
+async function fetchDashboardData() {
   try {
-    const response = await fetch('/api/query', {
-      method: 'POST',
+    const response = await fetch('/api/dashboard/stats', {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ sql, params }),
+      credentials: 'include'
     });
-    const result = await response.json();
-    return { data: result, error: null };
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch dashboard data');
+    }
+    
+    return await response.json();
   } catch (error) {
-    console.error('Database query error:', error);
-    return { data: null, error: error.message };
+    console.error('Dashboard data fetch error:', error);
+    return null;
   }
 }
 
@@ -65,48 +69,45 @@ export default function DashboardPage() {
         setProfile(JSON.parse(userData));
         setIsLoading(true);
 
-        // Fetch all data in parallel
-        const [
-          projectsData,
-          pendingData,
-          activeData,
-          documentsData,
-          recentProjectsData,
-          recentReportsData
-        ] = await Promise.all([
-          safeQuery('SELECT COUNT(*) as count FROM projects'),
-          safeQuery('SELECT COUNT(*) as count FROM projects WHERE status = ?', ['pending_approval']),
-          safeQuery('SELECT COUNT(*) as count FROM projects WHERE status = ?', ['in_progress']),
-          safeQuery('SELECT COUNT(*) as count FROM documents'),
-          safeQuery('SELECT p.*, d.name as district_name, u.name as creator_name FROM projects p LEFT JOIN districts d ON p.district_id = d.id LEFT JOIN users u ON p.created_by = u.id ORDER BY p.created_at DESC LIMIT 5'),
-          safeQuery('SELECT pr.*, p.contract_name as project_contract_name, u.name as creator_name FROM progress_reports pr LEFT JOIN projects p ON pr.project_id = p.id LEFT JOIN users u ON pr.created_by = u.id ORDER BY pr.created_at DESC LIMIT 5')
-        ]);
+        // Fetch dashboard data
+        const dashboardData = await fetchDashboardData();
+        
+        if (dashboardData) {
+          // Get user role from localStorage
+          const user = JSON.parse(localStorage.getItem('user') || '{}');
+          
+          // Update stats - for directors, don't show pending separately
+          setStats({
+            totalProjects: dashboardData.totalProjects || 0,
+            pendingProjects: user.role === 'director' ? 0 : dashboardData.pendingProjects || 0,
+            activeProjects: dashboardData.activeProjects || 0,
+            totalDocuments: dashboardData.totalDocuments || 0
+          });
 
-        // Update stats
-        setStats({
-          totalProjects: projectsData.data?.[0]?.count || 0,
-          pendingProjects: pendingData.data?.[0]?.count || 0,
-          activeProjects: activeData.data?.[0]?.count || 0,
-          totalDocuments: documentsData.data?.[0]?.count || 0
-        });
-
-        // Update recent projects
-        if (recentProjectsData.data) {
-          setRecentProjects(recentProjectsData.data.map(project => ({
+          // Update recent projects
+          setRecentProjects((dashboardData.recentProjects || []).map(project => ({
             ...project,
             contract_name: project.contract_name,
             district: { name: project.district_name },
             creator: { full_name: project.creator_name }
           })));
-        }
 
-        // Update recent reports
-        if (recentReportsData.data) {
-          setRecentReports(recentReportsData.data.map(report => ({
+          // Update recent reports
+          setRecentReports((dashboardData.recentReports || []).map(report => ({
             ...report,
             project: { contract_name: report.project_contract_name },
             creator: { full_name: report.creator_name }
           })));
+        } else {
+          // Fallback to default values if API fails
+          setStats({
+            totalProjects: 0,
+            pendingProjects: 0,
+            activeProjects: 0,
+            totalDocuments: 0
+          });
+          setRecentProjects([]);
+          setRecentReports([]);
         }
 
       } catch (error) {
@@ -173,12 +174,15 @@ export default function DashboardPage() {
             value={stats.totalProjects}
             icon={<FolderKanbanIcon className="h-6 w-6" />}
           />
-          <StatsCard
-            title="Pending Approval"
-            value={stats.pendingProjects}
-            icon={<ClockIcon className="h-6 w-6" />}
-            subtitle="Awaiting director review"
-          />
+          {/* Show Pending Approval card only for non-directors */}
+          {profile?.role !== 'director' && (
+            <StatsCard
+              title="Pending Approval"
+              value={stats.pendingProjects}
+              icon={<ClockIcon className="h-6 w-6" />}
+              subtitle="Awaiting director review"
+            />
+          )}
           <StatsCard
             title="Active Projects"
             value={stats.activeProjects}

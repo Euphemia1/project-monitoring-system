@@ -3,18 +3,40 @@ export type UserRole = "director" | "project_engineer" | "project_manager" | "vi
 export type ProjectStatus = "pending_approval" | "approved" | "in_progress" | "completed" | "on_hold"
 
 export type DocumentType =
+  | "precontract_document"
+  | "contract_record_details"
   | "contract_documentation"
+  | "contract_document"
+  | "contract_documents"
   | "bills_of_quantities"
   | "drawings"
   | "internal_approvals"
   | "site_instruction"
   | "site_inspection_report"
   | "site_meeting_minutes"
+  | "site_meeting_minutes_main"
+  | "contractors_reports"
+  | "contractors_reports_main"
   | "incoming_correspondence"
+  | "incoming_correspondence_main"
   | "outgoing_correspondence"
-  | "interim_payment_certificate"
+  | "outgoing_correspondence_main"
   | "internal_correspondence"
+  | "internal_memos"
+  | "interim_payment_certificate"
+  | "remeasurements"
+  | "remeasurements_main"
+  | "interim_valuations_certificate"
+  | "interim_valuations_certificate_main"
   | "progress_report_attachment"
+  | "variation_measurement"
+  | "measurement_of_variations"
+  | "final_account_remeasurement"
+  | "remeasurement_main"
+  | "delays_disruptions_records"
+  | "all_reports"
+  | "how_to_use_filling_system"
+  | "other_report"
 
 export interface District {
   id: string
@@ -95,17 +117,33 @@ export interface TradeProgress {
   trade?: Trade
 }
 
+export type ActionStatus = 'pending' | 'in_progress' | 'completed'
+
+export interface ActionAssignee {
+  id: string
+  name: string
+  email?: string
+  role?: string
+  created_at: string
+}
+
 export interface Document {
   id: string
   project_id: string
   progress_report_id: string | null
   document_type: DocumentType
   title: string
+  description?: string
   file_url: string
   file_name: string
   file_size: number | null
   uploaded_by: string
+  action_required?: string
+  action_assignee_id?: string
+  action_status?: ActionStatus
+  action_response?: string
   is_locked: boolean
   created_at: string
   uploader?: Profile
+  action_assignee?: ActionAssignee
 }
