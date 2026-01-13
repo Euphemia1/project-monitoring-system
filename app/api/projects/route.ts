@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { query, transaction } from '@/lib/db'
 import { getCurrentUser } from '@/lib/user'
-import { v4 as uuidv4 } from 'uuid'
 
 /* ===========================
    GET PROJECTS
@@ -20,7 +19,7 @@ export async function GET(request: Request) {
     // SINGLE PROJECT
     // ---------------------------
     if (id) {
-      const values: any[] = [id]
+      const values: any[] = []
       let permissionJoin = ''
       let permissionWhere = ''
 
@@ -29,6 +28,8 @@ export async function GET(request: Request) {
         permissionWhere = ' AND pa.user_id IS NOT NULL '
         values.push(user.id)
       }
+
+      values.push(id)
 
       const rows: any[] = await query(
         `
@@ -100,7 +101,7 @@ export async function GET(request: Request) {
         house_type: s.house_type,
         created_at: s.created_at,
         trades: trades
-          .filter(t => t.section_id === s.id)
+          .filter(t => String(t.section_id) === String(s.id))
           .map(t => ({
             id: String(t.id),
             section_id: String(t.section_id),
@@ -172,11 +173,7 @@ export async function GET(request: Request) {
 =========================== */
 export async function POST(request: Request) {
   try {
-    console.log('🚀 Starting project creation...')
-    
     const user = await getCurrentUser()
-    console.log('👤 User:', user ? `${user.id} (${user.role})` : 'null')
-    
     if (!user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
@@ -186,7 +183,6 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    console.log('📋 Request body:', JSON.stringify(body, null, 2))
 
     const {
       contract_no,
@@ -203,7 +199,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    console.log('🔄 Starting transaction...')
     const created = await transaction(async (connection) => {
       // Insert project WITHOUT specifying ID (let database auto-increment)
       const [projectResult] = await connection.execute(
@@ -226,7 +221,6 @@ export async function POST(request: Request) {
 
       // Get the auto-generated project ID
       const projectId = (projectResult as any).insertId
-      console.log('✅ Project inserted with ID:', projectId)
 
       await connection.execute(
         `
@@ -236,7 +230,6 @@ export async function POST(request: Request) {
         [projectId, user.id, user.id]
       )
 
-      console.log(`📦 Processing ${sections.length} sections...`)
       for (let i = 0; i < sections.length; i++) {
         const section = sections[i]
 
@@ -254,15 +247,12 @@ export async function POST(request: Request) {
         )
 
         const sectionId = (sectionResult as any).insertId
-        console.log(`  ✅ Section ${i + 1} inserted with ID:`, sectionId)
 
         const trades = section.trades || []
-        console.log(`    Processing ${trades.length} trades...`)
-        
+
         for (let j = 0; j < trades.length; j++) {
           const trade = trades[j]
           if (!trade.name) {
-            console.log(`    Trade ${j + 1}: skipped (no name)`)
             continue
           }
 
@@ -277,22 +267,19 @@ export async function POST(request: Request) {
               Number(trade.amount ?? 0),
             ]
           )
-          console.log(`    ✅ Trade ${j + 1} inserted:`, trade.name)
         }
       }
 
       return projectId
     })
 
-    console.log('✨ Project created successfully with ID:', created)
     return NextResponse.json(
       { success: true, id: created },
       { status: 201 }
     )
   } catch (error) {
-    console.error('❌ CREATE PROJECT ERROR:', error)
-    console.error('Error details:', error instanceof Error ? error.message : String(error))
-    
+    console.error('CREATE PROJECT ERROR:', error)
+
     return NextResponse.json({ 
       error: 'Failed to create project',
       details: error instanceof Error ? error.message : String(error)
@@ -328,19 +315,13 @@ export async function DELETE(request: Request) {
 =========================== */
 export async function PUT(request: Request) {
   try {
-    console.log('PUT /api/projects called');
-    
     const user = await getCurrentUser()
     if (!user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
-    console.log('User:', user);
 
     const id = new URL(request.url).searchParams.get('id')
-    console.log('Project ID:', id);
-    
     const body = await request.json()
-    console.log('Request body:', body);
 
     if (!id) {
       return NextResponse.json({ error: 'Missing project id' }, { status: 400 })
@@ -366,19 +347,29 @@ export async function PUT(request: Request) {
     if (!projectResult.length) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
-    
+
     const project = projectResult[0]
-    console.log('Project status:', project.status);
-    
-    const canEdit = user.role === 'director' || 
-                   (user.role === 'project_engineer' && project.status === 'pending_approval')
-    
+
+    if (user.role !== 'director') {
+      const access: any[] = await query(
+        'SELECT 1 FROM project_assignments WHERE project_id = ? AND user_id = ? LIMIT 1',
+        [id, user.id],
+      )
+      if (!access.length) {
+        return NextResponse.json({ error: 'Not authorized to edit this project' }, { status: 403 })
+      }
+    }
+
+    const canEdit =
+      user.role === 'director' ||
+      user.role === 'project_manager' ||
+      (user.role === 'project_engineer' && project.status === 'pending_approval')
+
     if (!canEdit) {
       return NextResponse.json({ error: 'Not authorized to edit this project' }, { status: 403 })
     }
 
     // Update project details
-    console.log('Updating project with ID:', id);
     await query(
       `UPDATE projects 
        SET contract_no = ?, contract_name = ?, district_id = ?, 
@@ -394,41 +385,33 @@ export async function PUT(request: Request) {
         id
       ]
     )
-    console.log('Project updated successfully');
 
     // First, get existing sections and trades to identify what needs to be deleted
     const existingSections = await query(
       `SELECT id FROM project_sections WHERE project_id = ?`,
       [id]
     )
-    
+
     const existingSectionIds = existingSections.map((s: any) => String(s.id));
     const incomingSectionIds = sections.filter(s => s.id).map(s => String(s.id));
-    
-    console.log('Existing section IDs:', existingSectionIds);
-    console.log('Incoming section IDs:', incomingSectionIds);
-    
+
     // Delete sections that are no longer in the form
     const sectionsToDelete = existingSectionIds.filter(
       existingId => !incomingSectionIds.includes(existingId)
     );
-    
-    console.log('Sections to delete:', sectionsToDelete);
-    
+
     if (sectionsToDelete.length > 0) {
       const placeholders = sectionsToDelete.map(() => '?').join(',');
       await query(
         `DELETE FROM project_sections WHERE id IN (${placeholders}) AND project_id = ?`,
         [...sectionsToDelete, id]
       );
-      console.log('Deleted sections:', sectionsToDelete);
     }
 
     // Update and create sections
     for (const section of sections) {
       if (section.id) {
         // Update existing section - FIXED: Convert empty string to null
-        console.log('Updating section with ID:', section.id);
         await query(
           `UPDATE project_sections 
            SET section_name = ?, house_type = ?
@@ -437,14 +420,12 @@ export async function PUT(request: Request) {
         )
       } else {
         // Create new section - FIXED: removed array destructuring & convert empty string to null
-        console.log('Creating new section:', section.name);
         const sectionResult: any = await query(
           `INSERT INTO project_sections (project_id, section_name, house_type)
            VALUES (?, ?, ?)`,
           [id, section.name, section.house_type || null]
         )
         section.id = sectionResult.insertId
-        console.log('Created section with ID:', section.id);
       }
 
       // Get existing trades for this section to identify what needs to be deleted
@@ -453,27 +434,21 @@ export async function PUT(request: Request) {
           `SELECT id FROM trades WHERE section_id = ?`,
           [section.id]
         )
-        
+
         const existingTradeIds = existingTrades.map((t: any) => String(t.id));
         const incomingTradeIds = (section.trades || []).filter(t => t.id).map(t => String(t.id));
-        
-        console.log(`Section ${section.id} - Existing trade IDs:`, existingTradeIds);
-        console.log(`Section ${section.id} - Incoming trade IDs:`, incomingTradeIds);
-        
+
         // Delete trades that are no longer in the form
         const tradesToDelete = existingTradeIds.filter(
           existingId => !incomingTradeIds.includes(existingId)
         );
-        
-        console.log(`Section ${section.id} - Trades to delete:`, tradesToDelete);
-        
+
         if (tradesToDelete.length > 0) {
           const placeholders = tradesToDelete.map(() => '?').join(',');
           await query(
             `DELETE FROM trades WHERE id IN (${placeholders}) AND section_id = ?`,
             [...tradesToDelete, section.id]
           );
-          console.log(`Section ${section.id} - Deleted trades:`, tradesToDelete);
         }
       }
 
@@ -481,7 +456,6 @@ export async function PUT(request: Request) {
       for (const trade of section.trades || []) {
         if (trade.id) {
           // Update existing trade
-          console.log(`Updating trade with ID: ${trade.id} in section ${section.id}`);
           await query(
             `UPDATE trades 
              SET trade_name = ?, amount = ?
@@ -490,7 +464,6 @@ export async function PUT(request: Request) {
           )
         } else {
           // Create new trade
-          console.log(`Creating new trade: ${trade.name} in section ${section.id}`);
           await query(
             `INSERT INTO trades (section_id, trade_name, amount)
              VALUES (?, ?, ?)`,
@@ -499,7 +472,7 @@ export async function PUT(request: Request) {
         }
       }
     }
-    
+
     // Additional cleanup: delete any trades in sections that were deleted
     // This handles cases where sections were removed from the form
     if (sectionsToDelete.length > 0) {
@@ -508,14 +481,11 @@ export async function PUT(request: Request) {
         `DELETE FROM trades WHERE section_id IN (${placeholders})`,
         sectionsToDelete
       );
-      console.log('Deleted orphaned trades from deleted sections');
     }
-    
-    console.log('Project update completed successfully');
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('UPDATE PROJECT ERROR:', error)
-    console.error('Error details:', error instanceof Error ? error.message : String(error));
     return NextResponse.json({ error: 'Failed to update project', details: error instanceof Error ? error.message : String(error) }, { status: 500 })
   }
 }
