@@ -9,13 +9,8 @@ export const runtime = "nodejs"
 
 async function canAccessProject(user: any, projectId: string): Promise<boolean> {
   if (!user) return false
-  if (user.role === "director") return true
-
-  const rows: any[] = await query(
-    "SELECT 1 FROM project_assignments WHERE project_id = ? AND user_id = ? LIMIT 1",
-    [projectId, user.id],
-  )
-  return rows.length > 0
+  // Allow all staff roles to access all projects for actions
+  return ["director", "project_engineer", "project_manager"].includes(user.role)
 }
 
 export async function GET(request: Request) {
@@ -30,12 +25,6 @@ export async function GET(request: Request) {
 
     const values: any[] = []
     const where: string[] = []
-
-    let accessJoin = ""
-    if (user.role !== "director") {
-      accessJoin = " INNER JOIN project_assignments pa ON pa.project_id = d.project_id AND pa.user_id = ? "
-      values.push(user.id)
-    }
 
     if (projectId) {
       where.push("d.project_id = ?")
@@ -57,7 +46,7 @@ export async function GET(request: Request) {
         d.file_name,
         d.size,
         d.uploaded_by,
-        d.uploaded_at,
+        d.created_at,
         d.status,
         d.action_required,
         d.action_assignee_id,
@@ -66,13 +55,15 @@ export async function GET(request: Request) {
         d.is_locked,
         u.name AS uploader_name,
         p.contract_no AS project_contract_no,
-        p.contract_name AS project_contract_name
+        p.contract_name AS project_contract_name,
+        au.name AS assignee_name,
+        au.role AS assignee_role
       FROM documents d
       LEFT JOIN users u ON u.id = d.uploaded_by
       LEFT JOIN projects p ON p.id = d.project_id
-      ${accessJoin}
+      LEFT JOIN users au ON au.id = d.action_assignee_id
       ${whereSql}
-      ORDER BY d.uploaded_at DESC
+      ORDER BY d.created_at DESC
       `,
       values,
     )

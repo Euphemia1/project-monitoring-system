@@ -18,12 +18,13 @@ interface UploadDocumentFormProps {
   selectedProjectId: string
   selectedReportId: string
   userId: string
+  users: { id: string; name: string; email: string; role: string }[]
 }
 
 const DOCUMENT_TYPES: { value: DocumentType; label: string; category: string }[] = [
   // Precontract documents
   { value: "precontract_document", label: "Precontract Document", category: "Precontract" },
-  
+
   // Contract documents
   { value: "contract_record_details", label: "Contract Record Details", category: "Contract" },
   { value: "contract_documentation", label: "Contract Documentation", category: "Contract" },
@@ -32,7 +33,7 @@ const DOCUMENT_TYPES: { value: DocumentType; label: string; category: string }[]
   { value: "bills_of_quantities", label: "Bills of Quantities", category: "Contract" },
   { value: "drawings", label: "Drawings", category: "Contract" },
   { value: "internal_approvals", label: "Internal Approvals", category: "Contract" },
-  
+
   // Site documents
   { value: "site_instruction", label: "Site Instruction", category: "Site" },
   { value: "site_inspection_report", label: "Site Inspection Report", category: "Site" },
@@ -40,7 +41,7 @@ const DOCUMENT_TYPES: { value: DocumentType; label: string; category: string }[]
   { value: "site_meeting_minutes_main", label: "Site Meeting Minutes (Main)", category: "Site" },
   { value: "contractors_reports", label: "Contractor's Reports", category: "Site" },
   { value: "contractors_reports_main", label: "Contractor's Reports (Main)", category: "Site" },
-  
+
   // Correspondence
   { value: "incoming_correspondence", label: "Incoming Correspondence", category: "Correspondence" },
   { value: "incoming_correspondence_main", label: "Incoming Correspondence (Main)", category: "Correspondence" },
@@ -48,32 +49,32 @@ const DOCUMENT_TYPES: { value: DocumentType; label: string; category: string }[]
   { value: "outgoing_correspondence_main", label: "Outgoing Correspondence (Main)", category: "Correspondence" },
   { value: "internal_correspondence", label: "Internal Correspondence", category: "Correspondence" },
   { value: "internal_memos", label: "Internal Memos", category: "Correspondence" },
-  
+
   // Interim Payment files
   { value: "interim_payment_certificate", label: "Interim Payment Certificate", category: "Interim Payment" },
   { value: "remeasurements", label: "Remeasurements", category: "Interim Payment" },
   { value: "remeasurements_main", label: "Remeasurements (Main)", category: "Interim Payment" },
   { value: "interim_valuations_certificate", label: "Interim Valuations & Certificate", category: "Interim Payment" },
   { value: "interim_valuations_certificate_main", label: "Interim Valuations & Certificate (Main)", category: "Interim Payment" },
-  
+
   // Variation Account
   { value: "variation_measurement", label: "Variation Measurement", category: "Variation" },
   { value: "measurement_of_variations", label: "Measurement of Variations", category: "Variation" },
-  
+
   // Final Account Records
   { value: "final_account_remeasurement", label: "Final Account Remeasurement", category: "Final Account" },
   { value: "remeasurement_main", label: "Remeasurement (Main)", category: "Final Account" },
-  
+
   // Contract Administration
   { value: "delays_disruptions_records", label: "Delays & Disruptions Records", category: "Contract Administration" },
-  
+
   // Reports
   { value: "progress_report_attachment", label: "Progress Report Attachment", category: "Reports" },
   { value: "all_reports", label: "All Type of Reports", category: "Reports" },
-  
+
   // System documentation
   { value: "how_to_use_filling_system", label: "How to use the Filling System", category: "System Documentation" },
-  
+
   // Other
   { value: "other_report", label: "Other Report", category: "Other" },
 ]
@@ -84,6 +85,7 @@ export function UploadDocumentForm({
   selectedProjectId,
   selectedReportId,
   userId,
+  users,
 }: UploadDocumentFormProps) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -93,7 +95,7 @@ export function UploadDocumentForm({
 
   const [projectId, setProjectId] = useState(selectedProjectId)
   const [reportId, setReportId] = useState(selectedReportId)
-  const [documentType, setDocumentType] = useState<DocumentType>("contract_documentation") // Updated default value
+  const [documentType, setDocumentType] = useState<DocumentType>("contract_documentation")
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [actionRequired, setActionRequired] = useState("")
@@ -105,7 +107,6 @@ export function UploadDocumentForm({
     if (file) {
       setSelectedFile(file)
       if (!title) {
-        // Auto-fill title from filename
         setTitle(file.name.replace(/\.[^/.]+$/, ""))
       }
     }
@@ -154,7 +155,7 @@ export function UploadDocumentForm({
       formData.append("title", title)
       formData.append("description", description)
       formData.append("action_required", actionRequired)
-      formData.append("action_assignee_id", actionAssigneeId)
+      formData.append("action_assignee_id", actionAssigneeId === "none" ? "" : actionAssigneeId)
       formData.append("file", selectedFile)
 
       const res = await fetch("/api/documents", {
@@ -170,7 +171,7 @@ export function UploadDocumentForm({
 
       setSuccess(true)
       setTimeout(() => {
-        router.push("/dashboard/documents")
+        router.push("/dashboard/efiling")
         router.refresh()
       }, 1500)
     } catch (err) {
@@ -196,7 +197,6 @@ export function UploadDocumentForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
-      {/* Project & Report Selection */}
       <Card className="border-border">
         <CardHeader>
           <CardTitle className="text-foreground">Document Details</CardTitle>
@@ -251,25 +251,6 @@ export function UploadDocumentForm({
             </div>
           </div>
 
-          {progressReports.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="report">Link to Progress Report (Optional)</Label>
-              <Select value={reportId} onValueChange={setReportId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a progress report" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">No specific report</SelectItem>
-                  {progressReports.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      Report #{r.report_no} - {new Date(r.report_date).toLocaleDateString()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
           <div className="space-y-2">
             <Label htmlFor="title">Document Title *</Label>
             <Input
@@ -282,7 +263,7 @@ export function UploadDocumentForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">Description (Optional)</Label>
             <Input
               id="description"
               value={description}
@@ -291,29 +272,37 @@ export function UploadDocumentForm({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="actionRequired">Action Required</Label>
-            <Input
-              id="actionRequired"
-              value={actionRequired}
-              onChange={(e) => setActionRequired(e.target.value)}
-              placeholder="Describe action required for this document"
-            />
-          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="actionRequired">Action Required (Optional)</Label>
+              <Input
+                id="actionRequired"
+                value={actionRequired}
+                onChange={(e) => setActionRequired(e.target.value)}
+                placeholder="Describe action needed"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="actionAssigneeId">Assign To</Label>
-            <Input
-              id="actionAssigneeId"
-              value={actionAssigneeId}
-              onChange={(e) => setActionAssigneeId(e.target.value)}
-              placeholder="Enter assignee name or email"
-            />
+            <div className="space-y-2">
+              <Label htmlFor="actionAssigneeId">Assign To</Label>
+              <Select value={actionAssigneeId} onValueChange={setActionAssigneeId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a person" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No assignment</SelectItem>
+                  {users?.map((u) => (
+                    <SelectItem key={u.id?.toString()} value={u.id?.toString() || "none"}>
+                      {u.name} ({u?.role?.replace("_", " ") || 'User'})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* File Upload */}
       <Card className="border-border">
         <CardHeader>
           <CardTitle className="text-foreground">Upload File</CardTitle>
@@ -321,11 +310,10 @@ export function UploadDocumentForm({
         </CardHeader>
         <CardContent>
           <div
-            className={`relative rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
-              selectedFile
-                ? "border-emerald-300 bg-emerald-50"
-                : "border-border hover:border-[#E87A1E] hover:bg-[#E87A1E]/5"
-            }`}
+            className={`relative rounded-lg border-2 border-dashed p-8 text-center transition-colors ${selectedFile
+              ? "border-emerald-300 bg-emerald-50"
+              : "border-border hover:border-[#E87A1E] hover:bg-[#E87A1E]/5"
+              }`}
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
@@ -366,7 +354,7 @@ export function UploadDocumentForm({
                 </div>
                 <div>
                   <p className="font-medium text-foreground">Drop your file here or click to browse</p>
-                  <p className="text-sm text-muted-foreground">Supports PDF, Word, Excel, and image files</p>
+                  <p className="text-sm text-muted-foreground">Supports PDF, Word, Excel, and images</p>
                 </div>
               </div>
             )}
@@ -374,14 +362,9 @@ export function UploadDocumentForm({
         </CardContent>
       </Card>
 
-      {/* Error Message */}
-      {error && <div className="rounded-lg bg-destructive/10 p-4 text-destructive">{error}</div>}
+      {error && <div className="rounded-lg bg-destructive/10 p-4 text-destructive text-sm">{error}</div>}
 
-      {/* Submit Buttons */}
-      <div className="flex justify-end gap-4">
-        <Button type="button" variant="outline" onClick={() => router.back()} disabled={isLoading}>
-          Cancel
-        </Button>
+      <div className="flex justify-end gap-3">
         <Button
           type="submit"
           className="bg-[#E87A1E] text-white hover:bg-[#D16A0E]"
@@ -403,3 +386,4 @@ export function UploadDocumentForm({
     </form>
   )
 }
+

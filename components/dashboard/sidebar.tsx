@@ -26,6 +26,7 @@ interface NavigationItem {
   icon: any
   permission?: string
   isSection?: boolean
+  disabled?: boolean
 }
 
 export function Sidebar() {
@@ -35,58 +36,67 @@ export function Sidebar() {
   const { user, hasPermission } = useUser()
 
   const navigation: NavigationItem[] = [
-    { 
-      name: "Dashboard", 
-      href: "/dashboard", 
+    {
+      name: "Dashboard",
+      href: "/dashboard",
       icon: LayoutDashboardIcon,
       permission: 'view_dashboard'
     },
-    { 
-      name: "Projects", 
-      href: "/dashboard/projects", 
+    {
+      name: "Projects",
+      href: "/dashboard/projects",
       icon: FolderKanbanIcon,
       permission: 'view_projects'
     },
-    { 
-      name: "Progress", 
-      href: "/dashboard/progress", 
-      icon: FileTextIcon,
-      permission: 'view_progress'
-    },
-    { 
-      name: "Documents", 
-      href: "/dashboard/documents", 
+    {
+      name: "E-filing",
+      href: "/dashboard/efiling",
       icon: FileTextIcon,
       permission: 'view_documents'
     },
-    { 
-      name: "Reports", 
-      href: "/dashboard/reports", 
+    {
+      name: "Progress",
+      href: "/dashboard/progress",
+      icon: FileTextIcon,
+      permission: 'view_progress',
+      disabled: true
+    },
+    {
+      name: "Documents",
+      href: "/dashboard/documents",
+      icon: FileTextIcon,
+      permission: 'view_documents',
+      disabled: true
+    },
+    {
+      name: "Reports",
+      href: "/dashboard/reports",
       icon: BarChart3Icon,
-      permission: 'view_reports'
+      permission: 'view_reports',
+      disabled: true
     }
   ]
 
   const adminNavigation: NavigationItem[] = [
-    { 
-      name: "User Management", 
-      href: "/dashboard/users", 
+    {
+      name: "User Management",
+      href: "/dashboard/users",
       icon: UsersIcon,
       permission: 'manage_users'
     },
-    { 
-      name: "System Settings", 
-      href: "/dashboard/settings", 
+    {
+      name: "System Settings",
+      href: "/dashboard/settings",
       icon: SettingsIcon,
       permission: 'manage_settings'
     }
   ]
 
-  const filteredNavigation = navigation.filter(item => 
-    !item.permission || hasPermission(item.permission)
+  const filteredNavigation = navigation.filter(item =>
+    (!item.permission || hasPermission(item.permission)) && !item.disabled
   )
 
-  const filteredAdminNavigation = adminNavigation.filter(item => 
+  const filteredAdminNavigation = adminNavigation.filter(item =>
     hasPermission(item.permission!)
   )
 
@@ -109,7 +119,7 @@ export function Sidebar() {
       localStorage.removeItem('user');
       document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       document.cookie = 'user-role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      
+
       // Redirect to login page
       window.location.href = '/auth/login';
     } catch (error) {
@@ -149,20 +159,33 @@ export function Sidebar() {
       <nav className="flex-1 overflow-y-auto p-4">
         <div className="space-y-1">
           {filteredNavigation.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center px-3 py-2 text-sm font-medium rounded-md",
-                "hover:bg-gray-100",
-                pathname === item.href 
-                  ? "bg-gray-100 text-[#E87A1E]" 
-                  : "text-gray-700 hover:text-[#E87A1E]"
-              )}
-            >
-              <item.icon className="h-5 w-5 mr-3" />
-              {!collapsed && item.name}
-            </Link>
+            item.disabled ? (
+              <div
+                key={item.href}
+                className={cn(
+                  "flex items-center px-3 py-2 text-sm font-medium rounded-md cursor-not-allowed opacity-50 text-gray-400 bg-gray-50/50"
+                )}
+                title="This section is currently disabled"
+              >
+                <item.icon className="h-5 w-5 mr-3" />
+                {!collapsed && item.name}
+              </div>
+            ) : (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                  "hover:bg-gray-100",
+                  pathname === item.href
+                    ? "bg-gray-100 text-[#E87A1E]"
+                    : "text-gray-700 hover:text-[#E87A1E]"
+                )}
+              >
+                <item.icon className="h-5 w-5 mr-3" />
+                {!collapsed && item.name}
+              </Link>
+            )
           ))}
         </div>
 

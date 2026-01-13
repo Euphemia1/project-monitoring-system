@@ -146,4 +146,6 @@ export interface Document {
   created_at: string
   uploader?: Profile
   action_assignee?: ActionAssignee
+  assignee_name?: string
+  assignee_role?: string
 }

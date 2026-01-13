@@ -6,12 +6,8 @@ export const runtime = "nodejs"
 
 async function canAccessProject(user: any, projectId: string): Promise<boolean> {
   if (!user) return false
-  if (user.role === "director") return true
-  const rows: any[] = await query(
-    "SELECT 1 FROM project_assignments WHERE project_id = ? AND user_id = ? LIMIT 1",
-    [projectId, user.id],
-  )
-  return rows.length > 0
+  // Allow all staff roles to access all projects
+  return ["director", "project_engineer", "project_manager"].includes(user.role)
 }
 
 export async function GET(request: Request) {
@@ -47,10 +43,7 @@ export async function GET(request: Request) {
       }
 
       const r = reportRows[0]
-      const allowed = await canAccessProject(user, String(r.project_id))
-      if (!allowed) {
-        return NextResponse.json({ error: "Not authorized" }, { status: 403 })
-      }
+      // Project access check removed to allow staff-wide visibility
 
       const tradeProgress: any[] = await query(
         `
@@ -141,10 +134,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Missing project_id" }, { status: 400 })
     }
 
-    const allowed = await canAccessProject(user, String(projectId))
-    if (!allowed) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 })
-    }
+    // Project access check removed to allow staff-wide visibility
 
     const rows: any[] = await query(
       `

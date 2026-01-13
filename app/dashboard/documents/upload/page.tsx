@@ -56,6 +56,9 @@ export default async function UploadDocumentPage({ searchParams }: PageProps) {
     )) as any[]
   }
 
+  // Fetch users for target assignment
+  const users: any[] = await query("SELECT id, name, email, role FROM users WHERE is_active = 1 ORDER BY name", [])
+
   return (
     <div className="min-h-screen">
       <Header title="Upload Document" subtitle="Add a new document to a project" />
@@ -66,6 +69,7 @@ export default async function UploadDocumentPage({ searchParams }: PageProps) {
           selectedProjectId={projectId || ""}
           selectedReportId={reportId || ""}
           userId={user.id?.toString?.() || ""}
+          users={users || []}
         />
       </div>
     </div>

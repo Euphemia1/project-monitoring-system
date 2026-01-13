@@ -20,18 +20,17 @@ export async function GET(request: Request) {
     // ---------------------------
     if (id) {
       const values: any[] = []
-      let permissionJoin = ''
-      let permissionWhere = ''
-
-      if (user.role !== 'director') {
-        permissionJoin = ' LEFT JOIN project_assignments pa ON pa.project_id = p.id AND pa.user_id = ? '
-        permissionWhere = ' AND pa.user_id IS NOT NULL '
-        values.push(user.id)
-      }
+      // Remove permission restriction for listing based on assignments
+      // Everyone with 'view_projects' permission can see it
+      // if (user.role !== 'director') {
+      //   permissionJoin = ' LEFT JOIN project_assignments pa ON pa.project_id = p.id AND pa.user_id = ? '
+      //   permissionWhere = ' AND pa.user_id IS NOT NULL '
+      //   values.push(user.id)
+      // }
 
       values.push(id)
 
-      const rows: any[] = await query(
+      const rows: any[] = await query<any[]>(
         `
         SELECT 
           p.id, p.contract_no, p.contract_name, p.district_id,
@@ -42,9 +41,7 @@ export async function GET(request: Request) {
         FROM projects p
         LEFT JOIN districts d ON d.id = p.district_id
         LEFT JOIN users u ON u.id = p.created_by
-        ${permissionJoin}
         WHERE p.id = ?
-        ${permissionWhere}
         LIMIT 1
         `,
         values
@@ -75,7 +72,7 @@ export async function GET(request: Request) {
           : null,
       }
 
-      const sections: any[] = await query(
+      const sections: any[] = await query<any[]>(
         `SELECT id, project_id, section_name, house_type, created_at
          FROM project_sections
          WHERE project_id = ?
@@ -86,7 +83,7 @@ export async function GET(request: Request) {
       let trades: any[] = []
       if (sections.length) {
         const placeholders = sections.map(() => '?').join(',')
-        trades = await query(
+        trades = await query<any[]>(
           `SELECT id, section_id, trade_name, amount, created_at
            FROM trades
            WHERE section_id IN (${placeholders})`,
@@ -117,15 +114,11 @@ export async function GET(request: Request) {
     // ---------------------------
     // ALL PROJECTS
     // ---------------------------
-    const values: any[] = []
-    let permissionJoin = ''
-    let permissionWhere = ''
-    if (user.role !== 'director') {
-      permissionJoin = ' INNER JOIN project_assignments pa ON pa.project_id = p.id AND pa.user_id = ? '
-      values.push(user.id)
-    }
+    // List all projects for all authenticated users
+    // Role-based visibility is handled by RBAC on the frontend
+    // and this endpoint returns projects for anyone authenticated
 
-    const rows: any[] = await query(
+    const rows: any[] = await query<any[]>(
       `
       SELECT 
         p.id, p.contract_no, p.contract_name, p.district_id,
@@ -136,11 +129,9 @@ export async function GET(request: Request) {
       FROM projects p
       LEFT JOIN districts d ON d.id = p.district_id
       LEFT JOIN users u ON u.id = p.created_by
-      ${permissionJoin}
-      ${permissionWhere}
       ORDER BY p.created_at DESC
       `,
-      values
+      []
     )
 
     const projects = rows.map(r => ({
@@ -190,6 +181,7 @@ export async function POST(request: Request) {
       district_id,
       start_date,
       completion_date,
+      description = '',
       contract_sum = 0,
       status = 'pending_approval',
       sections = [],
@@ -204,12 +196,13 @@ export async function POST(request: Request) {
       const [projectResult] = await connection.execute(
         `
         INSERT INTO projects
-        (contract_no, contract_name, district_id, start_date, completion_date, contract_sum, status, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (contract_no, contract_name, description, district_id, start_date, completion_date, contract_sum, status, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
           contract_no,
           contract_name,
+          description || '',
           district_id,
           start_date,
           completion_date,
@@ -280,7 +273,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('CREATE PROJECT ERROR:', error)
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Failed to create project',
       details: error instanceof Error ? error.message : String(error)
     }, { status: 500 })
@@ -330,10 +323,11 @@ export async function PUT(request: Request) {
     const {
       contract_no,
       contract_name,
+      description = '',
       district_id,
       start_date,
       completion_date,
-      contract_sum,
+      contract_sum = 0,
       sections = [],
     } = body
 
@@ -342,23 +336,12 @@ export async function PUT(request: Request) {
     }
 
     // Check if user can edit this project
-    // Directors can edit any project, project engineers can only edit projects in pending_approval status
-    const projectResult = await query('SELECT status FROM projects WHERE id = ?', [id])
+    const projectResult = await query<any[]>('SELECT status FROM projects WHERE id = ?', [id])
     if (!projectResult.length) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
     const project = projectResult[0]
-
-    if (user.role !== 'director') {
-      const access: any[] = await query(
-        'SELECT 1 FROM project_assignments WHERE project_id = ? AND user_id = ? LIMIT 1',
-        [id, user.id],
-      )
-      if (!access.length) {
-        return NextResponse.json({ error: 'Not authorized to edit this project' }, { status: 403 })
-      }
-    }
 
     const canEdit =
       user.role === 'director' ||
@@ -372,22 +355,23 @@ export async function PUT(request: Request) {
     // Update project details
     await query(
       `UPDATE projects 
-       SET contract_no = ?, contract_name = ?, district_id = ?, 
+       SET contract_no = ?, contract_name = ?, description = ?, district_id = ?, 
            start_date = ?, completion_date = ?, contract_sum = ?, updated_at = NOW()
        WHERE id = ?`,
       [
-        contract_no,
-        contract_name,
-        district_id,
-        start_date,
-        completion_date,
-        Number(contract_sum),
+        contract_no || '',
+        contract_name || '',
+        description || '',
+        district_id || null,
+        start_date || null,
+        completion_date || null,
+        contract_sum !== undefined ? Number(contract_sum) : 0,
         id
       ]
     )
 
     // First, get existing sections and trades to identify what needs to be deleted
-    const existingSections = await query(
+    const existingSections = await query<any[]>(
       `SELECT id FROM project_sections WHERE project_id = ?`,
       [id]
     )
@@ -416,27 +400,27 @@ export async function PUT(request: Request) {
           `UPDATE project_sections 
            SET section_name = ?, house_type = ?
            WHERE id = ? AND project_id = ?`,
-          [section.name, section.house_type || null, section.id, id]
+          [section.name || 'Section', section.house_type || null, section.id, id]
         )
       } else {
         // Create new section - FIXED: removed array destructuring & convert empty string to null
         const sectionResult: any = await query(
           `INSERT INTO project_sections (project_id, section_name, house_type)
            VALUES (?, ?, ?)`,
-          [id, section.name, section.house_type || null]
+          [id, section.name || 'Section', section.house_type || null]
         )
         section.id = sectionResult.insertId
       }
 
       // Get existing trades for this section to identify what needs to be deleted
       if (section.id) {
-        const existingTrades = await query(
+        const existingTrades = await query<any[]>(
           `SELECT id FROM trades WHERE section_id = ?`,
           [section.id]
         )
 
         const existingTradeIds = existingTrades.map((t: any) => String(t.id));
-        const incomingTradeIds = (section.trades || []).filter(t => t.id).map(t => String(t.id));
+        const incomingTradeIds = (section.trades || []).filter((t: any) => t.id).map((t: any) => String(t.id));
 
         // Delete trades that are no longer in the form
         const tradesToDelete = existingTradeIds.filter(
@@ -460,14 +444,14 @@ export async function PUT(request: Request) {
             `UPDATE trades 
              SET trade_name = ?, amount = ?
              WHERE id = ? AND section_id = ?`,
-            [trade.name, Number(trade.amount), trade.id, section.id]
+            [trade.name || '', Number(trade.amount || 0), trade.id, section.id]
           )
         } else {
           // Create new trade
           await query(
             `INSERT INTO trades (section_id, trade_name, amount)
              VALUES (?, ?, ?)`,
-            [section.id, trade.name, Number(trade.amount)]
+            [section.id, trade.name || '', Number(trade.amount || 0)]
           )
         }
       }

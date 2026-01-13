@@ -13,9 +13,11 @@ interface Document {
   project_id: string
   project_name: string
   uploaded_by: string
-  uploaded_at: string
+  created_at: string
   status: 'pending' | 'approved' | 'rejected'
   uploaded_by_name?: string
+  assignee_name?: string
+  assignee_role?: string
 }
 
 export default async function DocumentsPage() {
@@ -31,11 +33,11 @@ export default async function DocumentsPage() {
 
     // Fetch documents with related data
     const docValues: any[] = []
-    let accessJoin = ""
-    if (user.role !== "director") {
-      accessJoin = " INNER JOIN project_assignments pa ON pa.project_id = d.project_id AND pa.user_id = ? "
-      docValues.push(user.id)
-    }
+    // Simplified: Allow all users to see documents
+    // if (user.role !== "director") {
+    //   accessJoin = " INNER JOIN project_assignments pa ON pa.project_id = d.project_id AND pa.user_id = ? "
+    //   docValues.push(user.id)
+    // }
 
     const documents = (await query(
       `
@@ -47,32 +49,33 @@ export default async function DocumentsPage() {
         d.url,
         d.size,
         d.uploaded_by,
-        d.uploaded_at,
+        d.created_at,
         d.status,
         p.contract_name as project_name,
-        u.name as uploaded_by_name
+        u.name as uploaded_by_name,
+        au.name as assignee_name,
+        au.role as assignee_role
       FROM documents d
       LEFT JOIN projects p ON d.project_id = p.id
       LEFT JOIN users u ON d.uploaded_by = u.id
-      ${accessJoin}
-      ORDER BY d.uploaded_at DESC
+      LEFT JOIN users au ON d.action_assignee_id = au.id
+      ORDER BY d.created_at DESC
       `,
       docValues,
     )) as Document[]
 
     // Fetch projects for the filter dropdown
     const projectValues: any[] = []
-    let projectJoin = ""
-    if (user.role !== "director") {
-      projectJoin = " INNER JOIN project_assignments pa ON pa.project_id = p.id AND pa.user_id = ? "
-      projectValues.push(user.id)
-    }
+    // Simplified: Allow all users to see projects
+    // if (user.role !== "director") {
+    //   projectJoin = " INNER JOIN project_assignments pa ON pa.project_id = p.id AND pa.user_id = ? "
+    //   projectValues.push(user.id)
+    // }
 
     const projects = (await query(
       `
       SELECT p.id, p.contract_name as name
       FROM projects p
-      ${projectJoin}
       ORDER BY p.contract_name
       `,
       projectValues,
@@ -127,6 +130,9 @@ export default async function DocumentsPage() {
                     Uploaded By
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Assigned To
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -167,16 +173,25 @@ export default async function DocumentsPage() {
                         {doc.uploaded_by_name || 'System'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(doc.uploaded_at).toLocaleDateString()}
+                        {doc.assignee_name ? (
+                          <div className="flex flex-col">
+                            <span className="font-medium text-[#E87A1E]">{doc.assignee_name}</span>
+                            <span className="text-[10px] capitalize">({doc.assignee_role?.replace('_', ' ') || 'User'})</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 italic">Unassigned</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(doc.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          doc.status === 'approved' 
-                            ? 'bg-green-100 text-green-800' 
-                            : doc.status === 'rejected' 
-                            ? 'bg-red-100 text-red-800' 
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${doc.status === 'approved'
+                          ? 'bg-green-100 text-green-800'
+                          : doc.status === 'rejected'
+                            ? 'bg-red-100 text-red-800'
                             : 'bg-yellow-100 text-yellow-800'
-                        }`}>
+                          }`}>
                           {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
                         </span>
                       </td>
