@@ -30,6 +30,7 @@ export default function ProjectPage({ params }: PageProps) {
   const [sections, setSections] = useState<ProjectApiResponse['sections']>([])
   const [documents, setDocuments] = useState<Document[]>([])
   const [progressReports, setProgressReports] = useState<ProgressReport[]>([])
+  const [users, setUsers] = useState<any[]>([])
 
   useEffect(() => {
     const load = async () => {
@@ -48,7 +49,7 @@ export default function ProjectPage({ params }: PageProps) {
 
         // Get the resolved params
         const resolvedParams = await params;
-        
+
         const res = await fetch(`/api/projects?id=${encodeURIComponent(resolvedParams.id)}`, {
           credentials: 'include',
           cache: 'no-store'
@@ -122,6 +123,16 @@ export default function ProjectPage({ params }: PageProps) {
           }))
           setProgressReports(mappedReports)
         }
+
+        // Fetch users
+        const usersRes = await fetch('/api/users', {
+          credentials: 'include',
+          cache: 'no-store'
+        })
+        if (usersRes.ok) {
+          const usersData = await usersRes.json()
+          setUsers(usersData)
+        }
       } catch (e) {
         console.error('Failed to load project:', e)
         setError(e instanceof Error ? e.message : 'Failed to load project')
@@ -162,6 +173,7 @@ export default function ProjectPage({ params }: PageProps) {
           documents={documents as any}
           userRole={userRole}
           userId={userId}
+          users={users}
         />
       </div>
     </div>

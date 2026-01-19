@@ -29,6 +29,7 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts"
 import Link from "next/link"
 import type { Project, ProjectSection, ProgressReport, Document, Trade, UserRole } from "@/lib/types"
+import { EFilingInterface } from "@/components/documents/efiling-interface"
 
 const COLORS = ["#E87A1E", "#3b82f6", "#10b981", "#8b5cf6", "#f43f5e", "#f59e0b", "#06b6d4"]
 
@@ -43,6 +44,7 @@ interface ProjectDetailsProps {
   documents: (Document & { uploader: { full_name: string } })[]
   userRole: UserRole
   userId: string
+  users: any[]
 }
 
 export function ProjectDetails({
@@ -52,6 +54,7 @@ export function ProjectDetails({
   documents,
   userRole,
   userId,
+  users,
 }: ProjectDetailsProps) {
   const router = useRouter()
   const [isApproving, setIsApproving] = useState(false)
@@ -161,6 +164,50 @@ export function ProjectDetails({
     }
   }
 
+  const [isExporting, setIsExporting] = useState(false)
+
+  const handleExportZip = async () => {
+    setIsExporting(true)
+    setShowExportMenu(false)
+
+    try {
+      const res = await fetch(`/api/projects/export?id=${project.id}`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || 'Failed to export project')
+      }
+
+      // Create blob from response
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      // Use filename from header if available, or fallback
+      const contentDisposition = res.headers.get('Content-Disposition')
+      let filename = `project-${project.contract_no}-archive.zip`
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/)
+        if (match && match[1]) filename = match[1]
+      }
+
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+    } catch (error) {
+      console.error("Export failed:", error)
+      window.alert(error instanceof Error ? error.message : "Failed to export project ZIP")
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   const calculateTotalProgress = () => {
     // This would calculate based on all trade progress across all reports
     // For now, return a placeholder
@@ -169,124 +216,7 @@ export function ProjectDetails({
 
   const statusInfo = getStatusBadge(project.status)
 
-  const EFILING_GROUPS: {
-    key: string
-    label: string
-    children?: { key: string; label: string; types: string[] }[]
-    types?: string[]
-  }[] = [
-      { key: "precontract", label: "Precontract documents", types: ["precontract_document"] },
-      {
-        key: "contract",
-        label: "Contract Document",
-        children: [
-          { key: "contract-record", label: "Contract Record details", types: ["contract_record_details"] },
-          { key: "contract-docs", label: "Contract documents", types: ["contract_documentation", "contract_document", "contract_documents"] },
-        ],
-      },
-      {
-        key: "correspondence",
-        label: "Correspondence",
-        children: [
-          { key: "incoming", label: "Incoming", types: ["incoming_correspondence", "incoming_correspondence_main"] },
-          { key: "outgoing", label: "Outgoing", types: ["outgoing_correspondence", "outgoing_correspondence_main"] },
-          { key: "internal", label: "Internal memos", types: ["internal_memos", "internal_correspondence"] },
-        ],
-      },
-      {
-        key: "interim",
-        label: "Interim Payment files",
-        children: [
-          { key: "remeasurements", label: "Remeasurements", types: ["remeasurements", "remeasurements_main", "remeasurement_main"] },
-          { key: "interim-valuations", label: "Interim Valuations & Certificate", types: ["interim_payment_certificate", "interim_valuations_certificate", "interim_valuations_certificate_main"] },
-        ],
-      },
-      {
-        key: "site-meetings",
-        label: "Site Meetings",
-        children: [
-          { key: "contractors-reports", label: "Contractors Reports", types: ["contractors_reports", "contractors_reports_main"] },
-          { key: "site-minutes", label: "Site Meeting Minutes", types: ["site_meeting_minutes", "site_meeting_minutes_main"] },
-        ],
-      },
-      {
-        key: "variation",
-        label: "Variation Account",
-        children: [{ key: "measurement-variations", label: "Measurement of variations", types: ["variation_measurement", "measurement_of_variations"] }],
-      },
-      {
-        key: "final-account",
-        label: "Final Account Records",
-        children: [{ key: "final-remeasure", label: "Remeasurement", types: ["final_account_remeasurement"] }],
-      },
-      {
-        key: "contract-admin",
-        label: "Contract Administration",
-        children: [{ key: "delays", label: "Delays & Disruptions records", types: ["delays_disruptions_records"] }],
-      },
-      { key: "reports", label: "Reports", types: ["all_reports", "progress_report_attachment", "other_report"] },
-      { key: "howto", label: "How to use the Filling system", types: ["how_to_use_filling_system"] },
-    ]
-
-  const formatDateTime = (date: string) => {
-    return new Date(date).toLocaleString("en-ZM", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  const renderEFilingLeaf = (leaf: { key: string; label: string; types: string[] }) => {
-    const leafDocs = documents.filter((d) => leaf.types.includes(d.document_type as any))
-
-    return (
-      <details key={leaf.key} className="rounded-lg border border-border">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">
-          {leaf.label} ({leafDocs.length})
-        </summary>
-        <div className="p-4 pt-2">
-          {leafDocs.length ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>File name</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Comment</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Action response</TableHead>
-                    <TableHead className="text-center">View</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {leafDocs.map((doc) => (
-                    <TableRow key={doc.id}>
-                      <TableCell className="font-medium">{doc.title}</TableCell>
-                      <TableCell>{formatDateTime(doc.created_at)}</TableCell>
-                      <TableCell className="max-w-[240px] truncate">{doc.description || "-"}</TableCell>
-                      <TableCell className="max-w-[160px] truncate">{doc.action_assignee?.name || doc.action_assignee_id || "-"}</TableCell>
-                      <TableCell className="max-w-[200px] truncate">{doc.action_response || doc.action_status || "-"}</TableCell>
-                      <TableCell className="text-center">
-                        <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-4 w-4 mr-1" /> View
-                          </Button>
-                        </a>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">No files</div>
-          )}
-        </div>
-      </details>
-    )
-  }
+  // Removed EFILING_GROUPS, formatDateTime, and renderEFilingLeaf as they are replaced by EFilingInterface
 
   return (
     <div className="space-y-6 print-container">
@@ -298,71 +228,39 @@ export function ProjectDetails({
       </Button>
 
       {showEFiling && (
-        <div className="fixed inset-0 z-50">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setShowEFiling(false)}
-            aria-hidden="true"
-          />
-          <div className="absolute right-0 top-0 h-full w-full max-w-5xl bg-background shadow-xl">
-            <div className="flex h-full flex-col">
-              <div className="flex items-center justify-between border-b border-border p-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-foreground">Project Monitoring and Filling System</h2>
-                  <p className="text-sm text-muted-foreground">{project.contract_name}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Link href={`/dashboard/documents/upload?project=${project.id}`}>
-                    <Button size="sm" className="bg-[#E87A1E] text-white hover:bg-[#D16A0E]">
-                      <Plus className="mr-2 h-4 w-4" /> Upload File
-                    </Button>
-                  </Link>
-                  <Button variant="ghost" size="sm" onClick={() => setShowEFiling(false)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
+        <div className="fixed inset-0 z-50 overflow-hidden bg-black/40 flex justify-end">
+          <div className="w-full max-w-[90%] md:max-w-4xl h-full bg-background shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="flex items-center justify-between border-b p-4">
+              <div>
+                <h2 className="text-lg font-semibold">Project Files & Correspondence</h2>
+                <p className="text-sm text-muted-foreground">Manage documents for {project.contract_name}</p>
               </div>
-
-              <div className="flex-1 overflow-y-auto p-4">
-                <div className="space-y-4">
-                  {EFILING_GROUPS.map((g) => {
-                    if (g.children?.length) {
-                      return (
-                        <details key={g.key} className="rounded-lg border border-border">
-                          <summary className="cursor-pointer px-4 py-3 font-semibold text-foreground">{g.label}</summary>
-                          <div className="space-y-3 p-4 pt-2">
-                            {g.children.map(renderEFilingLeaf)}
-                          </div>
-                        </details>
-                      )
-                    }
-
-                    return renderEFilingLeaf({
-                      key: g.key,
-                      label: g.label,
-                      types: g.types || [],
-                    })
-                  })}
-
-                  <details className="rounded-lg border border-border">
-                    <summary className="cursor-pointer px-4 py-3 font-semibold text-foreground">Users</summary>
-                    <div className="p-4 pt-2 text-sm text-foreground space-y-2">
-                      <div>Admin</div>
-                      <div>Project Manager</div>
-                      <div>Site Engineers</div>
-                      <div className="pt-2 text-muted-foreground">
-                        The user will be given access to load file and delete file from the system.
-                      </div>
-                      <div className="text-muted-foreground">
-                        Whenever a new file is loaded the user will be expected to: add a file name, comment, and assign action.
-                      </div>
-                      <div className="text-muted-foreground">
-                        The system should keep record of when the file was loaded, who loaded the file, time and date.
-                      </div>
-                    </div>
-                  </details>
-                </div>
-              </div>
+              <Button variant="ghost" size="icon" onClick={() => setShowEFiling(false)}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-50/30">
+              <EFilingInterface
+                initialProjects={[project as any]}
+                initialDocuments={documents.map(d => ({
+                  ...d,
+                  id: String(d.id),
+                  project_id: String(d.project_id),
+                  file_url: d.file_url,
+                  file_size: d.file_size,
+                  created_at: d.created_at,
+                  title: d.title,
+                  project: {
+                    id: String(project.id),
+                    contract_no: project.contract_no,
+                    contract_name: project.contract_name
+                  },
+                  uploader: d.uploader
+                }))}
+                users={users}
+                userRole={userRole}
+                userId={userId}
+              />
             </div>
           </div>
         </div>
@@ -467,10 +365,11 @@ export function ProjectDetails({
                     onClick={() => setShowExportMenu(!showExportMenu)}
                     className="bg-gray-800 text-white hover:bg-gray-900"
                   >
-                    <Download className="mr-2 h-4 w-4" /> Export
+                    {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    Export
                   </Button>
                   {showExportMenu && (
-                    <div className="absolute right-0 mt-2 w-56 rounded-xl shadow-2xl bg-white ring-1 ring-black ring-opacity-5 z-50 overflow-hidden divide-y divide-gray-100">
+                    <div className="absolute right-0 mt-2 w-72 rounded-xl shadow-2xl bg-white ring-1 ring-black ring-opacity-5 z-50 overflow-hidden divide-y divide-gray-100">
                       <div className="py-2">
                         <button
                           onClick={() => {
@@ -503,7 +402,19 @@ export function ProjectDetails({
                           className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 w-full text-left transition-colors"
                         >
                           <Download className="h-4 w-4 text-blue-500" />
-                          Download JSON Package
+                          Download JSON Data Only
+                        </button>
+                        <button
+                          onClick={handleExportZip}
+                          className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 w-full text-left transition-colors border-t border-gray-100"
+                        >
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100/50 text-emerald-600">
+                            <Download className="h-4 w-4" />
+                          </div>
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium text-gray-900">Full Project Archive</span>
+                            <span className="text-xs text-gray-500">Includes all attached files (ZIP)</span>
+                          </div>
                         </button>
                       </div>
                     </div>
