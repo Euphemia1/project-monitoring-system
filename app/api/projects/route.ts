@@ -377,7 +377,7 @@ export async function PUT(request: Request) {
     )
 
     const existingSectionIds = existingSections.map((s: any) => String(s.id));
-    const incomingSectionIds = sections.filter(s => s.id).map(s => String(s.id));
+    const incomingSectionIds = sections.filter((s: any) => s.id).map((s: any) => String(s.id));
 
     // Delete sections that are no longer in the form
     const sectionsToDelete = existingSectionIds.filter(

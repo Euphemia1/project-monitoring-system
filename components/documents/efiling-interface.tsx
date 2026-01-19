@@ -251,84 +251,167 @@ export function EFilingInterface({
                                 <table className="w-full text-left">
                                     <thead>
                                         <tr className="bg-gray-50/30 border-b border-border">
-                                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">File Details</th>
-                                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date Loaded</th>
-                                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Comment/Action</th>
-                                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Action Response</th>
-                                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Action</th>
+                                            {selectedCategoryId === 'correspondence' ? (
+                                                <>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Correspondence Details</th>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Direction</th>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Action</th>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">File Details</th>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date Loaded</th>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Comment/Action</th>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Action Response</th>
+                                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Action</th>
+                                                </>
+                                            )}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border">
                                         {filteredDocuments.length > 0 ? (
-                                            filteredDocuments.map((doc) => (
-                                                <tr key={doc.id} className="hover:bg-gray-50/50 transition-colors group">
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-[#E87A1E]/10 group-hover:bg-[#E87A1E]/20 transition-colors">
-                                                                <FileTextIcon className="h-5 w-5 text-[#E87A1E]" />
+                                            filteredDocuments.map((doc) => {
+                                                if (selectedCategoryId === 'correspondence') {
+                                                    // Correspondence View
+                                                    let direction = "Internal";
+                                                    let directionColor = "text-gray-500 bg-gray-100";
+
+                                                    if (doc.document_type.includes('incoming')) {
+                                                        direction = "Incoming";
+                                                        directionColor = "text-emerald-600 bg-emerald-100";
+                                                    } else if (doc.document_type.includes('outgoing')) {
+                                                        direction = "Outgoing";
+                                                        directionColor = "text-blue-600 bg-blue-100";
+                                                    }
+
+                                                    // Custom date format: 14th/ Jan 2025
+                                                    const dateObj = new Date(doc.created_at);
+                                                    const day = dateObj.getDate();
+                                                    const suffix = ["th", "st", "nd", "rd"][(day % 10 > 3) ? 0 : (day % 100 - day % 10 !== 10) ? day % 10 : 0];
+                                                    const month = dateObj.toLocaleString('en-US', { month: 'short' });
+                                                    const year = dateObj.getFullYear();
+                                                    const formattedDate = `${day}${suffix}/ ${month} ${year}`;
+
+                                                    return (
+                                                        <tr key={doc.id} className="hover:bg-gray-50/50 transition-colors group">
+                                                            <td className="px-6 py-4">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-[#E87A1E]/10 group-hover:bg-[#E87A1E]/20 transition-colors">
+                                                                        <MessageSquareIcon className="h-5 w-5 text-[#E87A1E]" />
+                                                                    </div>
+                                                                    <div className="min-w-0">
+                                                                        <p className="font-semibold text-gray-900 truncate max-w-[300px]" title={doc.title}>
+                                                                            {doc.title}
+                                                                        </p>
+                                                                        <p className="text-xs text-muted-foreground truncate max-w-[250px]">
+                                                                            {doc.file_name}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-sm font-medium text-gray-700">
+                                                                {formattedDate}
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <Badge variant="outline" className={`border-0 font-medium ${directionColor}`}>
+                                                                    {direction}
+                                                                </Badge>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right">
+                                                                <div className="flex items-center justify-end gap-2">
+                                                                    <a
+                                                                        href={doc.file_url}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
+                                                                    >
+                                                                        View
+                                                                    </a>
+                                                                    <a
+                                                                        href={doc.file_url}
+                                                                        download
+                                                                        className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
+                                                                    >
+                                                                        <DownloadIcon className="h-4 w-4" />
+                                                                    </a>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                }
+
+                                                // Default View
+                                                return (
+                                                    <tr key={doc.id} className="hover:bg-gray-50/50 transition-colors group">
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-[#E87A1E]/10 group-hover:bg-[#E87A1E]/20 transition-colors">
+                                                                    <FileTextIcon className="h-5 w-5 text-[#E87A1E]" />
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <p className="font-semibold text-gray-900 truncate max-w-[200px]" title={doc.title}>
+                                                                        {doc.title}
+                                                                    </p>
+                                                                    <p className="text-xs text-muted-foreground truncate max-w-[150px]">
+                                                                        {doc.project?.contract_no || 'No Project'}
+                                                                    </p>
+                                                                </div>
                                                             </div>
-                                                            <div className="min-w-0">
-                                                                <p className="font-semibold text-gray-900 truncate max-w-[200px]" title={doc.title}>
-                                                                    {doc.title}
-                                                                </p>
-                                                                <p className="text-xs text-muted-foreground truncate max-w-[150px]">
-                                                                    {doc.project?.contract_no || 'No Project'}
-                                                                </p>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-600">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-medium underline decoration-[#E87A1E]/30">{formatDate(doc.created_at).split(',')[0]}</span>
+                                                                <span className="text-xs text-muted-foreground">{formatDate(doc.created_at).split(',')[1]}</span>
+                                                                <span className="text-[10px] flex items-center gap-1 mt-1 font-semibold text-gray-400 capitalize">
+                                                                    <UserIcon className="h-2 w-2" /> {doc.uploader?.full_name || 'System'}
+                                                                </span>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-sm text-gray-600">
-                                                        <div className="flex flex-col">
-                                                            <span className="font-medium underline decoration-[#E87A1E]/30">{formatDate(doc.created_at).split(',')[0]}</span>
-                                                            <span className="text-xs text-muted-foreground">{formatDate(doc.created_at).split(',')[1]}</span>
-                                                            <span className="text-[10px] flex items-center gap-1 mt-1 font-semibold text-gray-400 capitalize">
-                                                                <UserIcon className="h-2 w-2" /> {doc.uploader?.full_name || 'System'}
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        {doc.action_required ? (
-                                                            <div className="flex flex-col gap-1">
-                                                                <span className="text-sm font-medium text-gray-800">{doc.action_required}</span>
-                                                                {doc.assignee_name && (
-                                                                    <span className="text-[11px] text-[#E87A1E] flex items-center gap-1 font-bold">
-                                                                        <ClockIcon className="h-3 w-3" /> Assign To: {doc.assignee_name} ({doc.assignee_role?.replace('_', ' ') || 'User'})
-                                                                    </span>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            {doc.action_required ? (
+                                                                <div className="flex flex-col gap-1">
+                                                                    <span className="text-sm font-medium text-gray-800">{doc.action_required}</span>
+                                                                    {doc.assignee_name && (
+                                                                        <span className="text-[11px] text-[#E87A1E] flex items-center gap-1 font-bold">
+                                                                            <ClockIcon className="h-3 w-3" /> Assign To: {doc.assignee_name} ({doc.assignee_role?.replace('_', ' ') || 'User'})
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-sm text-gray-400 italic">No action required</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex flex-col gap-1.5">
+                                                                {getStatusBadge(doc.action_status || 'pending')}
+                                                                {doc.action_response && (
+                                                                    <p className="text-xs text-gray-600 italic">"{doc.action_response}"</p>
                                                                 )}
                                                             </div>
-                                                        ) : (
-                                                            <span className="text-sm text-gray-400 italic">No action required</span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex flex-col gap-1.5">
-                                                            {getStatusBadge(doc.action_status || 'pending')}
-                                                            {doc.action_response && (
-                                                                <p className="text-xs text-gray-600 italic">"{doc.action_response}"</p>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right">
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            <a
-                                                                href={doc.file_url}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
-                                                            >
-                                                                View
-                                                            </a>
-                                                            <a
-                                                                href={doc.file_url}
-                                                                download
-                                                                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
-                                                            >
-                                                                <DownloadIcon className="h-4 w-4" />
-                                                            </a>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                <a
+                                                                    href={doc.file_url}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
+                                                                >
+                                                                    View
+                                                                </a>
+                                                                <a
+                                                                    href={doc.file_url}
+                                                                    download
+                                                                    className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
+                                                                >
+                                                                    <DownloadIcon className="h-4 w-4" />
+                                                                </a>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })
                                         ) : (
                                             <tr>
                                                 <td colSpan={5} className="px-6 py-12 text-center">
