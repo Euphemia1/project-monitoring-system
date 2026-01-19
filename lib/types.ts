@@ -61,6 +61,7 @@ export interface Project {
   id: string
   contract_no: string
   contract_name: string
+  description?: string
   district_id: string
   start_date: string
   completion_date: string

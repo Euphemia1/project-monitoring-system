@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Inter, Roboto_Mono } from "next/font/google"
 import "./globals.css"
+import { Toaster } from "sonner"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 const robotoMono = Roboto_Mono({ subsets: ["latin"], variable: "--font-mono" })
@@ -44,7 +45,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${robotoMono.variable} font-sans antialiased`}>{children}</body>
+      <body className={`${inter.variable} ${robotoMono.variable} font-sans antialiased`}>
+        {children}
+        <Toaster position="top-right" />
+      </body>
     </html>
   )
 }

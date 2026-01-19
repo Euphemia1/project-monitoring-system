@@ -11,38 +11,18 @@ import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-interface Project {
-  id: string
-  contract_no: string
-  contract_name: string
-  status: string
-  start_date: string
-  completion_date: string
-  contract_sum: number
-  district: {
-    id: string
-    name: string
-    code: string
-  }
-  creator: {
-    id: string
-    full_name: string
-  }
-  created_at: string
-  updated_at: string
-}
+import type { Project, District, UserRole } from "@/lib/types"
 
-interface District {
-  id: string
-  name: string
-  code: string
+type ProjectWithRelations = Project & {
+  district: { id: string; name: string; code: string }
+  creator: { id: string; full_name: string }
 }
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [filteredProjects, setFilteredProjects] = useState<Project[]>([])
+  const [projects, setProjects] = useState<ProjectWithRelations[]>([])
+  const [filteredProjects, setFilteredProjects] = useState<ProjectWithRelations[]>([])
   const [districts, setDistricts] = useState<District[]>([])
-  const [userRole, setUserRole] = useState('viewer')
+  const [userRole, setUserRole] = useState<UserRole>('viewer')
   const [userId, setUserId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -51,7 +31,7 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [districtFilter, setDistrictFilter] = useState<string>('all')
   const router = useRouter()
-  
+
   const fetchData = async () => {
     try {
       setIsRefreshing(true)
@@ -91,7 +71,7 @@ export default function ProjectsPage() {
           'Pragma': 'no-cache'
         }
       })
-      
+
       // Handle authentication errors
       if (projectsRes.status === 401) {
         // Token expired or invalid, redirect to login
@@ -102,7 +82,7 @@ export default function ProjectsPage() {
         router.push('/auth/login')
         return
       }
-      
+
       if (!projectsRes.ok) {
         const errorText = await projectsRes.text()
         console.error('API Error:', errorText)
@@ -129,7 +109,7 @@ export default function ProjectsPage() {
       const districtsRes = await fetch('/api/districts', {
         credentials: 'include'
       })
-      
+
       // Handle authentication errors for districts
       if (districtsRes.status === 401) {
         // Token expired or invalid, redirect to login
@@ -140,13 +120,13 @@ export default function ProjectsPage() {
         router.push('/auth/login')
         return
       }
-      
+
       if (!districtsRes.ok) {
         const errorText = await districtsRes.text()
         console.error('Districts API Error:', errorText)
         throw new Error(`Failed to fetch districts: ${districtsRes.status} ${districtsRes.statusText}`)
       }
-      
+
       let districtsData
       try {
         districtsData = await districtsRes.json()
@@ -155,7 +135,7 @@ export default function ProjectsPage() {
         console.error('Invalid JSON response from districts:', errorText)
         throw new Error('Invalid response from districts server')
       }
-      
+
       setDistricts(districtsData)
 
     } catch (err) {
@@ -174,27 +154,27 @@ export default function ProjectsPage() {
   // Apply filters
   useEffect(() => {
     let result = [...projects]
-    
+
     // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
-      result = result.filter(project => 
+      result = result.filter(project =>
         project.contract_no.toLowerCase().includes(term) ||
         project.contract_name.toLowerCase().includes(term) ||
         project.district?.name.toLowerCase().includes(term)
       )
     }
-    
+
     // Apply status filter
     if (statusFilter !== 'all') {
       result = result.filter(project => project.status === statusFilter)
     }
-    
+
     // Apply district filter
     if (districtFilter !== 'all') {
       result = result.filter(project => project.district?.id === districtFilter)
     }
-    
+
     setFilteredProjects(result)
   }, [projects, searchTerm, statusFilter, districtFilter])
 
@@ -210,7 +190,7 @@ export default function ProjectsPage() {
       <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
         <Header
           title="Projects"
-          description="Loading projects..."
+          subtitle="Loading projects..."
         />
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -224,7 +204,7 @@ export default function ProjectsPage() {
       <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
         <Header
           title="Projects"
-          description="Error loading projects"
+          subtitle="Error loading projects"
         />
         <div className="text-red-500">{error}</div>
         <Button onClick={handleRefresh} disabled={isRefreshing}>
@@ -243,13 +223,12 @@ export default function ProjectsPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <Header
           title="Projects"
-          description="Manage all construction projects"
-          className="mb-0"
+          subtitle="Manage all construction projects"
         />
         <div className="flex items-center space-x-2">
-          <Button 
-            variant="outline" 
-            size="icon" 
+          <Button
+            variant="outline"
+            size="icon"
             onClick={handleRefresh}
             disabled={isRefreshing}
           >
@@ -276,7 +255,7 @@ export default function ProjectsPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        
+
         <div className="space-y-2">
           <label className="text-sm font-medium">Status</label>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -311,11 +290,11 @@ export default function ProjectsPage() {
           </Select>
         </div>
       </div>
-      
+
       {filteredProjects.length > 0 ? (
-        <ProjectsTable 
-          projects={filteredProjects} 
-          districts={districts} 
+        <ProjectsTable
+          projects={filteredProjects}
+          districts={districts}
           userRole={userRole}
           onProjectUpdated={fetchData}
         />
@@ -343,14 +322,14 @@ export default function ProjectsPage() {
           </div>
           <h3 className="text-lg font-medium">No projects found</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            {searchTerm || statusFilter !== 'all' || districtFilter !== 'all' 
-              ? 'No projects match your filters' 
+            {searchTerm || statusFilter !== 'all' || districtFilter !== 'all'
+              ? 'No projects match your filters'
               : 'Get started by creating a new project'}
           </p>
           <div className="flex gap-2">
             {(searchTerm || statusFilter !== 'all' || districtFilter !== 'all') ? (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setSearchTerm('')
                   setStatusFilter('all')

@@ -141,6 +141,22 @@
   .no-print {
     display: none !important;
   }
+  .print-container {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+  .print-logo {
+    display: block !important;
+    margin-bottom: 20px;
+  }
+  body {
+    background: white !important;
+  }
+  .Card {
+    border: 1px solid #ddd !important;
+    box-shadow: none !important;
+  }
   .print-section {
     margin-bottom: 30px;
     page-break-inside: avoid;
