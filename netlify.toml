@@ -1,0 +1,23 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+  functions = "netlify/functions"
+
+[context.production.environment]
+  NODE_ENV = "production"
+
+[context.deploy-preview]
+  NODE_ENV = "development"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[template.environment]
+  MYSQL_HOST = "Your MySQL host address"
+  MYSQL_PORT = "3306 (default)"
+  MYSQL_USER = "Database username"
+  MYSQL_PASSWORD = "Database password"
+  MYSQL_DATABASE = "Database name"
+  JWT_SECRET = "JWT secret key"
