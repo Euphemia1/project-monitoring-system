@@ -98,8 +98,8 @@ export async function GET(request: Request) {
         house_type: s.house_type,
         created_at: s.created_at,
         trades: trades
-          .filter(t => String(t.section_id) === String(s.id))
-          .map(t => ({
+          .filter((t: any) => String(t.section_id) === String(s.id))
+          .map((t: any) => ({
             id: String(t.id),
             section_id: String(t.section_id),
             trade_name: t.trade_name,
@@ -437,7 +437,8 @@ export async function PUT(request: Request) {
       }
 
       // Update trades for this section
-      for (const trade of section.trades || []) {
+      const trades = (section.trades || []) as any[]
+      for (const trade of trades) {
         if (trade.id) {
           // Update existing trade
           await query(

@@ -168,7 +168,7 @@ export default function ProjectPage({ params }: PageProps) {
       <div className="p-6">
         <ProjectDetails
           project={project as any}
-          sections={sections}
+          sections={sections as any}
           progressReports={progressReports as any}
           documents={documents as any}
           userRole={userRole}
