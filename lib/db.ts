@@ -43,7 +43,7 @@ pool.getConnection()
     try {
       const [rows] = await connection.execute('SELECT 1 as connected, DATABASE() as db');
       console.log('✅ Database connected successfully!');
-      console.log('📊 Database:', rows[0].db);
+      console.log('📊 Database:', (rows as any[])[0].db);
       console.log('🔗 Connection ID:', connection.threadId);
     } catch (error) {
       console.error('❌ Test query failed:', error);
@@ -65,7 +65,29 @@ pool.getConnection()
     }
   });
 
-export async function query<T extends RowDataPacket[][] | RowDataPacket[] | ResultSetHeader>(
+export async function query<T extends RowDataPacket[]>(
+  sql: string,
+  values?: any[]
+): Promise<T[]> {
+  const connection = await pool.getConnection();
+  try {
+    // Log queries in development only
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('📝 Query:', sql.substring(0, 150));
+    }
+    
+    const [rows] = await connection.execute(sql, values);
+    return rows as T[];
+  } catch (error) {
+    console.error('❌ Query error:', error);
+    console.error('Failed query:', sql);
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+export async function querySingle<T extends RowDataPacket>(
   sql: string,
   values?: any[]
 ): Promise<T> {
@@ -77,7 +99,7 @@ export async function query<T extends RowDataPacket[][] | RowDataPacket[] | Resu
     }
     
     const [rows] = await connection.execute(sql, values);
-    return rows as T;
+    return (rows as T[])[0];
   } catch (error) {
     console.error('❌ Query error:', error);
     console.error('Failed query:', sql);

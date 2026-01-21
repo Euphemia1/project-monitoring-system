@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { query } from "@/lib/db"
+import { query, querySingle } from "@/lib/db"
 import { getCurrentUser } from "@/lib/user"
 import path from "path"
 import { readFile } from "fs/promises"
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
             documents
         ] = await Promise.all([
             // Project Details
-            query('SELECT * FROM projects WHERE id = ?', [projectId]).then(res => (res as any)[0]),
+            querySingle('SELECT * FROM projects WHERE id = ?', [projectId]),
 
             // Sections
             query('SELECT * FROM project_sections WHERE project_id = ?', [projectId]),
