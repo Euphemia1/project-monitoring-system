@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
-import { Building2Icon, Loader2Icon } from "@/components/icons"
+import { Building2Icon, Loader2Icon } from "@/components/ui/icons"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
