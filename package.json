@@ -2,6 +2,7 @@
   "name": "my-v0-project",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@10.0.0",
   "scripts": {
     "build": "next build",
     "dev": "next dev",
@@ -52,7 +53,7 @@
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.454.0",
     "mysql2": "^3.16.0",
-    "next": "16.0.7",
+    "next": "^16.1.0",
     "next-themes": "latest",
     "postcss": "^8.5",
     "react": "19.2.2",
