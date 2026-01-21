@@ -1,6 +1,13 @@
 import mysql from 'mysql2/promise';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 
+// 🔍 ENV CHECK — runs on app startup
+console.log('DB ENV CHECK:', {
+  MYSQL_HOST: process.env.MYSQL_HOST,
+  MYSQL_USER: process.env.MYSQL_USER,
+  MYSQL_DATABASE: process.env.MYSQL_DATABASE,
+  NODE_ENV: process.env.NODE_ENV
+});
 // Create a connection pool
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST || 'localhost',
