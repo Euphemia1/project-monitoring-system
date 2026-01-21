@@ -8,11 +8,12 @@
 - **Reference**: https://nextjs.org/blog/CVE-2025-66478
 
 ### 2. Missing Tailwind CSS Dependencies
-- **Issue**: `@tailwindcss/postcss` was in devDependencies but needed in production
+- **Issue**: `@tailwindcss/postcss` and `tw-animate-css` were in devDependencies but needed in production
 - **Fix**: Moved Tailwind CSS dependencies to regular dependencies:
   - `@tailwindcss/postcss`
   - `postcss`
   - `tailwindcss`
+  - `tw-animate-css`
 
 ## Updated Package.json Structure
 
@@ -135,7 +136,7 @@ NODE_ENV=production
 ## Security Updates Applied
 ✅ Next.js remains at 16.0.7 (which is the patched version)
 ✅ React upgraded from 19.2.1 to 19.2.2 (security patch)
-✅ Dependencies properly organized for production builds
+✅ Tailwind CSS dependencies properly organized for production builds
 ✅ Environment variables secured with strong JWT secret
 
 ## Verification Checklist
