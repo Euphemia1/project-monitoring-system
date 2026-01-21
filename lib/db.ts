@@ -8,6 +8,15 @@ console.log('DB ENV CHECK:', {
   MYSQL_DATABASE: process.env.MYSQL_DATABASE,
   NODE_ENV: process.env.NODE_ENV
 });
+
+// Add error handling for connection issues
+process.on('unhandledRejection', (reason, promise) => {
+  console.log('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.log('Uncaught Exception:', error);
+});
 // Create a connection pool
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST || 'localhost',
