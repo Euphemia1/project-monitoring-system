@@ -1,14 +1,12 @@
 import mysql from 'mysql2/promise';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 
-// Force IPv4 by using 127.0.0.1 instead of localhost
+// Force IPv4
 const host = process.env.MYSQL_HOST || 'localhost';
-
-// If host is 'localhost', replace with 127.0.0.1 to force IPv4
 const resolvedHost = host === 'localhost' ? '127.0.0.1' : host;
 
 const pool = mysql.createPool({
-  host: resolvedHost,  // Use 127.0.0.1 instead of localhost
+  host: resolvedHost,
   user: process.env.MYSQL_USER || 'root',
   password: process.env.MYSQL_PASSWORD || '',
   database: process.env.MYSQL_DATABASE || 'project_monitoring',
@@ -17,44 +15,39 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  // Explicitly force IPv4
   family: 4,
-  // Add connection timeout
   connectTimeout: 10000,
-  // Add charset
-  charset: 'utf8mb4',
 });
 
-// Test connection on startup
-pool.getConnection()
-  .then(connection => {
-    console.log('✅ Database connected successfully to host:', connection.config.host);
-    connection.release();
-  })
-  .catch(err => {
-    console.error('❌ Database connection failed:', err.message);
-    console.error('Connection details:', {
-      host: resolvedHost,
-      user: process.env.MYSQL_USER,
-      database: process.env.MYSQL_DATABASE
-    });
-  });
-
+// Helper function to execute queries
 export async function query<T extends RowDataPacket[][] | RowDataPacket[] | ResultSetHeader>(
   sql: string,
   values?: any[]
 ): Promise<T> {
-  console.log('🔍 Executing query:', sql.substring(0, 100));
   const connection = await pool.getConnection();
   try {
     const [rows] = await connection.execute(sql, values);
     return rows as T;
+  } finally {
+    connection.release();
+  }
+}
+
+// Helper function to execute multiple queries in a transaction
+export async function transaction<T>(callback: (connection: mysql.PoolConnection) => Promise<T>): Promise<T> {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const result = await callback(connection);
+    await connection.commit();
+    return result;
   } catch (error) {
-    console.error('❌ Query error:', error);
+    await connection.rollback();
     throw error;
   } finally {
     connection.release();
   }
 }
 
+// Export default pool as well
 export default pool;
