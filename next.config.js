@@ -7,10 +7,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Enable experimental features for better module resolution
-  experimental: {
-    externalResolver: true,
-  },
 };
 
 module.exports = nextConfig;
+
